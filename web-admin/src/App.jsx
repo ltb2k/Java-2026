@@ -1,143 +1,49 @@
-import React, { useState } from "react";
-import {
-  Activity, Bell, Camera, CheckCircle2, CircleGauge, Cloud,
-  Droplets, Fan, FileDown, Gauge, Leaf, Lightbulb, Menu,
-  Power, Settings, Sprout, Thermometer, Wind, X
-} from "lucide-react";
-import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
-  Legend, ResponsiveContainer
-} from "recharts";
+import React,{useEffect,useState} from 'react';
 
-const chartData = [
-  { time:"00:00", humidity:86, temp:24.2 },
-  { time:"03:00", humidity:88, temp:24.0 },
-  { time:"06:00", humidity:92, temp:24.8 },
-  { time:"09:00", humidity:90, temp:26.5 },
-  { time:"12:00", humidity:87, temp:27.2 },
-  { time:"15:00", humidity:89, temp:26.8 },
-  { time:"18:00", humidity:91, temp:25.5 },
-  { time:"21:00", humidity:89.2, temp:25.8 }
-];
+import {Activity,Bell,Camera,CheckCircle2,CircleGauge,Cloud,FileDown,Fan,Leaf,Lightbulb,LogOut,Menu,Plus,Power,RefreshCw,Settings,Sprout,Thermometer,Trash2,Users,Wind,X} from 'lucide-react';
 
-function SensorCard({icon: Icon, title, value, unit, note, cls}) {
-  return (
-    <div className={`sensor-card ${cls}`}>
-      <div className="sensor-title"><span>{title}</span><Icon size={20}/></div>
-      <div className="sensor-value">{value}<small>{unit}</small></div>
-      <div className="sensor-note">{note}</div>
-    </div>
-  );
-}
+import {LineChart,Line,XAxis,YAxis,CartesianGrid,Tooltip,Legend,ResponsiveContainer} from 'recharts';
 
-function Device({icon: Icon, title, note, initial=false}) {
-  const [on, setOn] = useState(initial);
-  return (
-    <div className="device">
-      <div className="device-icon"><Icon size={19}/></div>
-      <div className="device-info"><b>{title}</b><span>{note}</span></div>
-      <button className={on ? "switch on" : "switch"} onClick={() => setOn(!on)}>
-        <span></span>{on ? "BẬT" : "TẮT"}
-      </button>
-    </div>
-  );
-}
+import * as api from './services/api';
 
-export default function App() {
-  const [mode, setMode] = useState("AUTO");
-  const [sidebar, setSidebar] = useState(true);
 
-  return (
-    <div className="app">
-      <aside className={sidebar ? "sidebar" : "sidebar collapsed"}>
-        <div className="brand"><div className="brand-logo"><Sprout size={22}/></div>{sidebar && <div><b>MUSHROOM</b><span>SMART FARM</span></div>}</div>
-        <nav>
-          <a className="active"><CircleGauge size={19}/> {sidebar && "Dashboard"}</a>
-          <a><Leaf size={19}/> {sidebar && "Khay nuôi trồng"}</a>
-          <a><Cloud size={19}/> {sidebar && "Phòng trồng"}</a>
-          <a><Activity size={19}/> {sidebar && "Dữ liệu cảm biến"}</a>
-          <a><Camera size={19}/> {sidebar && "Camera"}</a>
-          <a><Bell size={19}/> {sidebar && "Thông báo"}</a>
-          <a><Settings size={19}/> {sidebar && "Cài đặt"}</a>
-        </nav>
-        <div className="sidebar-bottom">
-          <div className="operator"><div className="avatar">OP</div>{sidebar && <div><b>Farm Operator</b><span>Đang hoạt động</span></div>}</div>
-        </div>
-      </aside>
 
-      <main className="main">
-        <header className="header">
-          <button className="icon-btn" onClick={() => setSidebar(!sidebar)}><Menu size={21}/></button>
-          <div><h1>Nhà Trồng Nấm Thông Minh</h1><p>Trang điều hành trung tâm & giám sát từ xa</p></div>
-          <div className="header-actions">
-            <div className="online"><span></span> ESP32 Online</div>
-            <button className="export"><FileDown size={17}/> Xuất báo cáo</button>
-            <button className="icon-btn"><Bell size={19}/></button>
-          </div>
-        </header>
+const menu=[['dashboard','Dashboard',CircleGauge],['trays','Khay nuôi trồng',Leaf],['rooms','Phòng trồng',Cloud],['sensors','Dữ liệu cảm biến',Activity],['devices','Thiết bị IoT',Power],['camera','Camera',Camera],['notifications','Thông báo',Bell],['users','Người dùng',Users],['harvests','Thu hoạch',Sprout],['settings','Cài đặt',Settings]];
 
-        <section className="rental">
-          <div><span>Mã định danh khay</span><b>TRAY-A101</b><small>Phòng 01 · Kệ 03</small></div>
-          <div><span>Giống nấm</span><b>Nấm Bào Ngư Xám</b><small>Pleurotus</small></div>
-          <div><span>Khách hàng thuê</span><b>Trần Văn B</b><small>Gói 30 ngày</small></div>
-          <div><span>Chu kỳ sinh trưởng</span><b className="cyan">Ngày 14 / 30</b><small>Giai đoạn ra quả thể</small></div>
-        </section>
+const fallback=[{time:'00:00',humidity:86,temp:24.2},{time:'03:00',humidity:88,temp:24},{time:'06:00',humidity:92,temp:24.8},{time:'09:00',humidity:90,temp:26.5},{time:'12:00',humidity:87,temp:27.2},{time:'15:00',humidity:89,temp:26.8},{time:'18:00',humidity:91,temp:25.5},{time:'21:00',humidity:89.2,temp:25.8}];
 
-        <section className="sensors">
-          <SensorCard icon={Thermometer} title="Nhiệt độ" value="25.8" unit="°C" note="Ngưỡng: 24.0 – 28.0 °C" cls="temp"/>
-          <SensorCard icon={Droplets} title="Độ ẩm" value="89.2" unit="%" note="Ngưỡng: 85.0 – 95.0 %" cls="hum"/>
-          <SensorCard icon={Wind} title="CO₂" value="640" unit="ppm" note="Mức tối đa: < 800 ppm" cls="co2"/>
-          <SensorCard icon={Lightbulb} title="Ánh sáng" value="420" unit="Lux" note="Chiếu sáng: 8 giờ/ngày" cls="lux"/>
-        </section>
+function Modal({title,onClose,children}){return <div className="modal-bg"><div className="modal"><div className="modal-head"><h2>{title}</h2><button className="icon-btn" onClick={onClose}><X/></button></div>{children}</div></div>}
 
-        <section className="grid-main">
-          <div className="panel camera-panel">
-            <div className="panel-head">
-              <div><h2>Camera trực tuyến</h2><span>TRAY-A101 · RTSP / HLS</span></div>
-              <div className="head-buttons"><button>📸 Chụp ảnh</button><button>⏱ Time-lapse</button></div>
-            </div>
-            <div className="camera">
-              <div className="live"><b>● TRỰC TIẾP</b><span>1080P · 30 FPS</span></div>
-              <div className="mushroom-visual"><Sprout size={90}/><div>CAMERA FEED</div><small>WebRTC / HLS stream</small></div>
-              <div className="ai-box"><b>Mushroom · 8.5 cm</b><span>Độ chín: 85%</span></div>
-            </div>
-          </div>
+function Login({onLogin}){const[email,setEmail]=useState('admin@mushroom.local'),[password,setPassword]=useState('Admin@123'),[err,setErr]=useState(''),[loading,setLoading]=useState(false);const go=async e=>{e.preventDefault();setLoading(true);setErr('');try{const r=await api.login(email,password);localStorage.setItem('token',r.token);localStorage.setItem('user',JSON.stringify(r.user));onLogin(r.user)}catch(e){setErr(e.message)}finally{setLoading(false)}};return <div className="login"><form onSubmit={go}><div className="logo big"><Sprout/></div><h1>MUSHROOM SMART FARM</h1><p>Đăng nhập hệ thống quản lý nấm</p>{err&&<div className="error">{err}</div>}<label>Email<input value={email} onChange={e=>setEmail(e.target.value)}/></label><label>Mật khẩu<input type="password" value={password} onChange={e=>setPassword(e.target.value)}/></label><button className="primary full" disabled={loading}>{loading?'Đang đăng nhập...':'Đăng nhập'}</button><small>Demo Admin: admin@mushroom.local / Admin@123</small></form></div>}
 
-          <div className="panel control">
-            <div className="panel-head"><div><h2>Điều khiển vi khí hậu</h2><span>ESP32 · Relay Controller</span></div><Power size={19}/></div>
-            <div className="mode"><button className={mode==="AUTO" ? "selected":""} onClick={()=>setMode("AUTO")}>Tự động</button><button className={mode==="MANUAL" ? "selected":""} onClick={()=>setMode("MANUAL")}>Thủ công</button></div>
-            <div className="mode-info"><Gauge size={16}/> Chế độ {mode === "AUTO" ? "tự động theo cảm biến" : "điều khiển thủ công"}</div>
-            <Device icon={Droplets} title="Máy phun sương" note="Tự ngắt khi độ ẩm > 92%" initial/>
-            <Device icon={Fan} title="Quạt thông gió" note="Tự bật khi CO₂ > 750 ppm"/>
-            <Device icon={Lightbulb} title="Đèn LED tán xạ" note="06:00 – 14:00 hàng ngày" initial/>
-            <button className="harvest"><CheckCircle2 size={18}/> Xác nhận thu hoạch & tạo đơn</button>
-          </div>
-        </section>
+function SensorCard({Icon,title,value,unit,note,cls}){return <div className={'sensor '+cls}><div className="st"><span>{title}</span><Icon size={20}/></div><div className="sv">{value}<small>{unit}</small></div><div className="sn">{note}</div></div>}
 
-        <section className="grid-bottom">
-          <div className="panel chart-panel">
-            <div className="panel-head"><div><h2>Biểu đồ môi trường</h2><span>24 giờ qua · cập nhật mỗi 5 giây</span></div><Activity size={19}/></div>
-            <div className="chart"><ResponsiveContainer width="100%" height="100%"><LineChart data={chartData}>
-              <CartesianGrid stroke="#23314f" strokeDasharray="3 3"/>
-              <XAxis dataKey="time" stroke="#71809b" />
-              <YAxis yAxisId="left" stroke="#38bdf8" domain={[70,100]}/>
-              <YAxis yAxisId="right" orientation="right" stroke="#f87171" domain={[20,35]}/>
-              <Tooltip contentStyle={{background:"#101a31",border:"1px solid #2a3a5c",borderRadius:8}}/>
-              <Legend/>
-              <Line yAxisId="left" type="monotone" dataKey="humidity" name="Độ ẩm (%)" stroke="#38bdf8" strokeWidth={3} dot={false}/>
-              <Line yAxisId="right" type="monotone" dataKey="temp" name="Nhiệt độ (°C)" stroke="#f87171" strokeWidth={3} dot={false}/>
-            </LineChart></ResponsiveContainer></div>
-          </div>
+function App(){const[user,setUser]=useState(()=>{try{return JSON.parse(localStorage.getItem('user'))}catch{return null}});const[page,setPage]=useState('dashboard');const[sidebar,setSidebar]=useState(true);const[toast,setToast]=useState('');const[refresh,setRefresh]=useState(0);if(!user)return <Login onLogin={setUser}/>;const logout=()=>{localStorage.clear();setUser(null)};const notify=x=>{setToast(x);setTimeout(()=>setToast(''),2500)};return <div className="app"><aside className={sidebar?'side':'side col'}><div className="brand"><div className="logo"><Sprout/></div>{sidebar&&<div><b>MUSHROOM</b><span>SMART FARM</span></div>}</div><nav>{menu.map(([id,label,Icon])=><button key={id} className={page===id?'nav active':'nav'} onClick={()=>setPage(id)}><Icon/>{sidebar&&label}</button>)}</nav><button className="logout" onClick={logout}><LogOut/>{sidebar&&'Đăng xuất'}</button></aside><main><header><button className="icon-btn" onClick={()=>setSidebar(!sidebar)}><Menu/></button><div><h1>Nhà Trồng Nấm Thông Minh</h1><p>Xin chào {user.fullName} · {user.role}</p></div><div className="actions"><span className="online">● ESP32 Online</span><button className="secondary" onClick={()=>setRefresh(x=>x+1)}><RefreshCw size={16}/> Làm mới</button><button className="icon-btn"><Bell/></button></div></header>{toast&&<div className="toast">{toast}</div>}<Page page={page} refresh={refresh} notify={notify}/></main></div>}
 
-          <div className="panel logs">
-            <div className="panel-head"><div><h2>Nhật ký tác vụ</h2><span>Hoạt động gần nhất</span></div><Activity size={19}/></div>
-            <div className="log"><time>13:05:12 · Hệ thống</time><b>Độ ẩm 89.2% → Tắt van phun sương</b></div>
-            <div className="log warning"><time>12:45:00 · Cảnh báo</time><b>CO₂ 710 ppm → Quạt thông gió kích hoạt</b></div>
-            <div className="log"><time>10:00:15 · Khách hàng</time><b>Truy cập Live Camera xem khay nấm</b></div>
-            <div className="log"><time>06:00:00 · Hẹn giờ</time><b>Bật đèn LED sinh học</b></div>
-          </div>
-        </section>
-      </main>
-    </div>
-  );
-}
+function Page({page,refresh,notify}){switch(page){case'dashboard':return <Dashboard refresh={refresh} notify={notify}/>;case'trays':return <Trays notify={notify}/>;case'rooms':return <Rooms notify={notify}/>;case'sensors':return <Sensors/>;case'devices':return <Devices notify={notify}/>;case'camera':return <CameraPage/>;case'notifications':return <Notifications notify={notify}/>;case'users':return <UsersPage notify={notify}/>;case'harvests':return <Harvests notify={notify}/>;case'settings':return <SettingsPage/>;default:return null}}
+
+function Dashboard({refresh,notify}){const[data,setData]=useState(null),[chart,setChart]=useState(fallback),[dev,setDev]=useState([]);useEffect(()=>{(async()=>{try{const[d,h,ds]=await Promise.all([api.dashboard(),api.sensorHistory(),api.devices()]);setData(d);setDev(ds);const by={};h.forEach(x=>{const k=new Date(x.recorded_at).toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'});by[k]??={time:k};if(x.sensor_type==='HUMIDITY')by[k].humidity=+x.value;if(x.sensor_type==='TEMPERATURE')by[k].temp=+x.value});if(Object.keys(by).length)setChart(Object.values(by).slice(-24))}catch(e){notify(e.message)}})()},[refresh]);const c=data?.current||{temperature:25.8,humidity:89.2,co2:640};const toggle=async d=>{try{const r=await api.toggleDevice(d.id,d.status==='ONLINE'?'OFFLINE':'ONLINE');setDev(v=>v.map(x=>x.id===d.id?r:x));notify('Đã cập nhật '+d.name)}catch(e){notify(e.message)}};return <><section className="rental"><div><span>Mã định danh khay</span><b>TRAY-A101</b><small>Phòng 01 · Kệ 03</small></div><div><span>Giống nấm</span><b>Nấm Bào Ngư Xám</b><small>Pleurotus</small></div><div><span>Khách hàng thuê</span><b>Trần Văn B</b><small>Gói 30 ngày</small></div><div><span>Chu kỳ sinh trưởng</span><b className="cyan">Ngày 14 / 30</b><small>Giai đoạn ra quả thể</small></div></section><section className="sensors"><SensorCard Icon={Thermometer} title="Nhiệt độ" value={Number(c.temperature).toFixed(1)} unit="°C" note="Ngưỡng: 24 – 28 °C" cls="temp"/><SensorCard Icon={Cloud} title="Độ ẩm" value={Number(c.humidity).toFixed(1)} unit="%" note="Ngưỡng: 85 – 95 %" cls="hum"/><SensorCard Icon={Wind} title="CO₂" value={Math.round(c.co2)} unit="ppm" note="Mức tối đa: < 800 ppm" cls="co2"/><SensorCard Icon={Lightbulb} title="Ánh sáng" value="420" unit="Lux" note="Chiếu sáng: 8 giờ/ngày" cls="lux"/></section><section className="grid"><div className="panel"><div className="ph"><div><h2>Camera trực tuyến</h2><span>TRAY-A101 · RTSP / HLS</span></div><Camera/></div><div className="camera"><div className="live">● TRỰC TIẾP · 1080P</div><Sprout size={85}/><span>CAMERA FEED</span><div className="aibox">Mushroom · 8.5 cm<br/><small>Độ chín: 85%</small></div></div></div><div className="panel control"><div className="ph"><div><h2>Điều khiển vi khí hậu</h2><span>{dev.length} thiết bị</span></div><Power/></div>{dev.length?dev.slice(0,4).map(d=><div className="device" key={d.id}><Power size={18}/><div className="di"><b>{d.name}</b><span>{d.device_code} · {d.status}</span></div><button className={d.status==='ONLINE'?'on':'off'} onClick={()=>toggle(d)}>{d.status==='ONLINE'?'BẬT':'TẮT'}</button></div>):<div className="empty">Chưa có thiết bị</div>}</div></section><section className="grid"><div className="panel chartpanel"><div className="ph"><div><h2>Biểu đồ môi trường</h2><span>24 giờ qua</span></div><Activity/></div><div className="chart"><ResponsiveContainer width="100%" height="100%"><LineChart data={chart}><CartesianGrid stroke="#243553" strokeDasharray="3 3"/><XAxis dataKey="time" stroke="#73819a"/><YAxis yAxisId="l" domain={[70,100]} stroke="#38bdf8"/><YAxis yAxisId="r" orientation="right" domain={[20,35]} stroke="#f87171"/><Tooltip/><Legend/><Line yAxisId="l" type="monotone" dataKey="humidity" name="Độ ẩm (%)" stroke="#38bdf8" strokeWidth={3} dot={false}/><Line yAxisId="r" type="monotone" dataKey="temp" name="Nhiệt độ (°C)" stroke="#f87171" strokeWidth={3} dot={false}/></LineChart></ResponsiveContainer></div></div><div className="panel stats"><h2>Thống kê hệ thống</h2><Stat n={data?.counts.rooms??0} t="Phòng trồng"/><Stat n={data?.counts.trays??0} t="Khay nuôi"/><Stat n={data?.counts.customers??0} t="Khách hàng"/><Stat n={data?.counts.onlineDevices??0} t="Thiết bị online"/></div></section></>}
+
+function Stat({n,t}){return <div className="stat"><b>{n}</b><span>{t}</span></div>}
+
+function Trays({notify}){const[data,setData]=useState([]),[rooms,setRooms]=useState([]),[open,setOpen]=useState(false);const load=async()=>{try{setData(await api.trays());setRooms(await api.rooms())}catch(e){notify(e.message)}};useEffect(()=>{load()},[]);const save=async e=>{e.preventDefault();const f=new FormData(e.currentTarget);try{await api.createTray({roomId:f.get('roomId')||null,code:f.get('code'),mushroomType:f.get('mushroomType'),rack:f.get('rack'),status:f.get('status'),growthDay:Number(f.get('growthDay')||0),expectedHarvestDate:f.get('expectedHarvestDate')||null});setOpen(false);load();notify('Đã thêm khay')}catch(e){notify(e.message)}};const del=async id=>{if(!confirm('Xóa khay này?'))return;try{await api.deleteTray(id);load();notify('Đã xóa khay')}catch(e){notify(e.message)}};return <PageTable title="Khay nuôi trồng" action={<button className="primary" onClick={()=>setOpen(true)}><Plus/> Thêm khay</button>}><table><thead><tr><th>Mã khay</th><th>Loại nấm</th><th>Phòng</th><th>Trạng thái</th><th>Ngày nuôi</th><th></th></tr></thead><tbody>{data.map(x=><tr key={x.id}><td><b>{x.code}</b></td><td>{x.mushroom_type}</td><td>{x.room_name||'—'}</td><td><span className="badge">{x.status}</span></td><td>{x.growth_day}</td><td><button className="danger-icon" onClick={()=>del(x.id)}><Trash2/></button></td></tr>)}</tbody></table>{open&&<Modal title="Thêm khay nuôi" onClose={()=>setOpen(false)}><form className="form" onSubmit={save}><label>Mã khay<input name="code" required placeholder="TRAY-A102"/></label><label>Giống nấm<input name="mushroomType" required placeholder="Nấm Bào Ngư Xám"/></label><label>Phòng<select name="roomId"><option value="">Chưa gán</option>{rooms.map(r=><option value={r.id} key={r.id}>{r.name}</option>)}</select></label><label>Kệ<input name="rack" placeholder="Kệ 01"/></label><label>Trạng thái<select name="status"><option>AVAILABLE</option><option>RENTED</option><option>GROWING</option><option>HARVEST_READY</option></select></label><label>Ngày nuôi<input name="growthDay" type="number" defaultValue="0" min="0"/></label><label>Ngày thu hoạch dự kiến<input name="expectedHarvestDate" type="date"/></label><button className="primary full">Lưu</button></form></Modal>}</PageTable>}
+
+function Rooms({notify}){const[data,setData]=useState([]),[open,setOpen]=useState(false);const load=()=>api.rooms().then(setData).catch(e=>notify(e.message));useEffect(()=>{load()},[]);const save=async e=>{e.preventDefault();const f=new FormData(e.currentTarget);try{await api.createRoom({name:f.get('name'),code:f.get('code'),location:f.get('location')});setOpen(false);load();notify('Đã thêm phòng')}catch(e){notify(e.message)}};const del=async id=>{if(!confirm('Xóa phòng?'))return;try{await api.deleteRoom(id);load();notify('Đã xóa')}catch(e){notify(e.message)}};return <PageTable title="Phòng trồng" action={<button className="primary" onClick={()=>setOpen(true)}><Plus/> Thêm phòng</button>}><table><thead><tr><th>Tên phòng</th><th>Mã</th><th>Vị trí</th><th>Trạng thái</th><th></th></tr></thead><tbody>{data.map(x=><tr key={x.id}><td><b>{x.name}</b></td><td>{x.code}</td><td>{x.location||'—'}</td><td><span className="badge">{x.status}</span></td><td><button className="danger-icon" onClick={()=>del(x.id)}><Trash2/></button></td></tr>)}</tbody></table>{open&&<Modal title="Thêm phòng" onClose={()=>setOpen(false)}><form className="form" onSubmit={save}><label>Tên phòng<input name="name" required/></label><label>Mã phòng<input name="code" required placeholder="ROOM-02"/></label><label>Vị trí<input name="location" placeholder="Khu B"/></label><button className="primary full">Lưu</button></form></Modal>}</PageTable>}
+
+function Sensors(){const[data,setData]=useState([]);useEffect(()=>{api.sensorHistory().then(setData).catch(()=>{})},[]);return <PageTable title="Dữ liệu cảm biến"><table><thead><tr><th>Thời gian</th><th>Loại</th><th>Giá trị</th><th>Đơn vị</th><th>Khay</th></tr></thead><tbody>{data.map((x,i)=><tr key={i}><td>{new Date(x.recorded_at).toLocaleString('vi-VN')}</td><td>{x.sensor_type}</td><td><b>{x.value}</b></td><td>{x.unit}</td><td>{x.tray_code||'—'}</td></tr>)}</tbody></table></PageTable>}
+
+function Devices({notify}){const[data,setData]=useState([]);const load=()=>api.devices().then(setData).catch(e=>notify(e.message));useEffect(()=>{load()},[]);const toggle=async x=>{try{const r=await api.toggleDevice(x.id,x.status==='ONLINE'?'OFFLINE':'ONLINE');setData(v=>v.map(d=>d.id===x.id?r:d));notify('Đã đổi trạng thái thiết bị')}catch(e){notify(e.message)}};return <PageTable title="Thiết bị IoT"><div className="cards">{data.map(x=><div className="device-card" key={x.id}><Power/><h3>{x.name}</h3><p>{x.device_code}</p><span className={x.status==='ONLINE'?'good':'muted'}>● {x.status}</span><button className={x.status==='ONLINE'?'on':'off'} onClick={()=>toggle(x)}>{x.status==='ONLINE'?'Tắt thiết bị':'Bật thiết bị'}</button></div>)}</div></PageTable>}
+
+function CameraPage(){const[data,setData]=useState([]);useEffect(()=>{api.cameras().then(setData).catch(()=>{})},[]);return <PageTable title="Camera giám sát"><div className="cards">{data.map(x=><div className="camera-card" key={x.id}><div className="camera small"><Camera size={55}/><span>{x.status}</span></div><h3>{x.name}</h3><p>Khay: {x.tray_code||'—'}</p><small>{x.stream_url||'Chưa cấu hình stream URL'}</small></div>)}</div></PageTable>}
+
+function Notifications({notify}){const[data,setData]=useState([]);const load=()=>api.notifications().then(setData).catch(e=>notify(e.message));useEffect(()=>{load()},[]);const read=async id=>{try{await api.readNotification(id);load()}catch(e){notify(e.message)}};return <PageTable title="Thông báo"><div className="notice-list">{data.length?data.map(x=><div className={'notice-row '+(!x.is_read?'unread':'')} key={x.id}><Bell/><div><b>{x.title}</b><p>{x.message}</p><small>{new Date(x.created_at).toLocaleString('vi-VN')}</small></div>{!x.is_read&&<button className="secondary" onClick={()=>read(x.id)}>Đã đọc</button>}</div>):<div className="empty">Chưa có thông báo</div>}</div></PageTable>}
+
+function UsersPage({notify}){const[data,setData]=useState([]);const load=()=>api.users().then(setData).catch(e=>notify(e.message));useEffect(()=>{load()},[]);const change=async(x,role)=>{try{const r=await api.updateUser(x.id,{role});setData(v=>v.map(u=>u.id===x.id?{...u,...r,role}:u));notify('Đã cập nhật role')}catch(e){notify(e.message)}};return <PageTable title="Người dùng"><table><thead><tr><th>Họ tên</th><th>Email</th><th>Role</th><th>Hoạt động</th></tr></thead><tbody>{data.map(x=><tr key={x.id}><td>{x.full_name}</td><td>{x.email}</td><td><select value={x.role} onChange={e=>change(x,e.target.value)}><option>ADMIN</option><option>FARM_OPERATOR</option><option>CUSTOMER</option></select></td><td>{x.is_active?'Có':'Không'}</td></tr>)}</tbody></table></PageTable>}
+
+function Harvests({notify}){const[data,setData]=useState([]),[trays,setTrays]=useState([]),[open,setOpen]=useState(false);const load=()=>Promise.all([api.harvests(),api.trays()]).then(([h,t])=>{setData(h);setTrays(t)}).catch(e=>notify(e.message));useEffect(()=>{load()},[]);const save=async e=>{e.preventDefault();const f=new FormData(e.currentTarget);try{await api.createHarvest({trayId:f.get('trayId'),quantityKg:Number(f.get('quantityKg')||0),harvestDate:f.get('harvestDate')||null,deliveryRequested:f.get('deliveryRequested')==='true',note:f.get('note')});setOpen(false);load();notify('Đã tạo bản ghi thu hoạch')}catch(e){notify(e.message)}};return <PageTable title="Thu hoạch" action={<button className="primary" onClick={()=>setOpen(true)}><Plus/> Tạo thu hoạch</button>}><table><thead><tr><th>Khay</th><th>Loại nấm</th><th>Khối lượng</th><th>Ngày</th><th>Giao hàng</th><th>Trạng thái</th></tr></thead><tbody>{data.map(x=><tr key={x.id}><td>{x.tray_code}</td><td>{x.mushroom_type}</td><td>{x.quantity_kg||'—'} kg</td><td>{x.harvest_date}</td><td>{x.delivery_requested?'Có':'Không'}</td><td><span className="badge">{x.status}</span></td></tr>)}</tbody></table>{open&&<Modal title="Tạo bản ghi thu hoạch" onClose={()=>setOpen(false)}><form className="form" onSubmit={save}><label>Khay<select name="trayId" required>{trays.map(x=><option key={x.id} value={x.id}>{x.code} · {x.mushroom_type}</option>)}</select></label><label>Khối lượng (kg)<input name="quantityKg" type="number" step="0.01"/></label><label>Ngày thu hoạch<input name="harvestDate" type="date"/></label><label>Yêu cầu giao hàng<select name="deliveryRequested"><option value="false">Không</option><option value="true">Có</option></select></label><label>Ghi chú<textarea name="note"/></label><button className="primary full">Lưu</button></form></Modal>}</PageTable>}
+
+function SettingsPage(){return <PageTable title="Cài đặt hệ thống"><div className="settings"><h3>Ngưỡng môi trường mặc định</h3><div className="setting-grid"><div>Nhiệt độ: <b>24–28 °C</b></div><div>Độ ẩm: <b>85–95%</b></div><div>CO₂ tối đa: <b>800 ppm</b></div><div>Chu kỳ cập nhật: <b>IoT → REST API</b></div></div><p className="muted">Các giá trị này đang hiển thị theo cấu hình hiện tại của hệ thống.</p></div></PageTable>}
+
+function PageTable({title,action,children}){return <section className="page"><div className="page-head"><div><h2>{title}</h2><p>Quản lý dữ liệu và thao tác trực tiếp với PostgreSQL</p></div>{action}</div><div className="panel tablepanel">{children}</div></section>}
+
+export default App;

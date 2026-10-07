@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: mushroom-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: mushroom_iot
+      POSTGRES_USER: mushroom
+      POSTGRES_PASSWORD: mushroom123
+    ports:
+      - "5432:5432"
+    volumes:
+      - mushroom_pgdata:/var/lib/postgresql/data
+volumes:
+  mushroom_pgdata:

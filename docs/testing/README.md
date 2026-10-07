@@ -1,0 +1,9 @@
+# Testing checklist
+- GET /api/health
+- POST /api/auth/login
+- GET /api/dashboard/summary
+- GET /api/trays
+- GET /api/sensors/latest
+- POST /api/sensors/ingest
+- GET /api/notifications
+- GET /api/harvests
