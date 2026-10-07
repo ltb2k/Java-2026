@@ -1,3 +1,0 @@
-const pool=require('../config/db');
-exports.list=async(req,res)=>{try{const r=await pool.query(`SELECT c.*,t.code tray_code FROM cameras c LEFT JOIN cultivation_trays t ON t.id=c.tray_id ORDER BY c.created_at DESC`);res.json(r.rows);}catch(e){res.status(500).json({message:e.message});}};
-exports.create=async(req,res)=>{try{const {trayId,name,streamUrl,status}=req.body;const r=await pool.query(`INSERT INTO cameras(tray_id,name,stream_url,status) VALUES($1,$2,$3,$4) RETURNING *`,[trayId||null,name,streamUrl||'',status||'OFFLINE']);res.status(201).json(r.rows[0]);}catch(e){res.status(400).json({message:e.message});}};
