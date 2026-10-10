@@ -5,7 +5,11 @@ const routes=require("./routes");
 const pool=require("./config/db");
 
 const app=express();
-app.use(cors({origin:process.env.CORS_ORIGIN||"*"}));
+const allowedOrigins=(process.env.CORS_ORIGIN||"*").split(",").map(origin=>origin.trim()).filter(Boolean);
+app.use(cors({origin:(origin,callback)=>{
+  if(!origin || allowedOrigins.includes("*") || allowedOrigins.includes(origin)) return callback(null,true);
+  return callback(new Error("Origin not allowed by CORS"));
+}}));
 app.use(express.json({limit:"1mb"}));
 
 app.get("/",(req,res)=>res.json({name:"Mushroom IoT API",version:"1.0.0",status:"running"}));
