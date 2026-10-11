@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS cultivation_trays (
 
 CREATE TABLE IF NOT EXISTS rental_packages (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name VARCHAR(100) NOT NULL,
+  name VARCHAR(100) NOT NULL UNIQUE,
   duration_days INT NOT NULL,
   price NUMERIC(12,2) NOT NULL,
   description TEXT,
@@ -57,6 +57,17 @@ CREATE TABLE IF NOT EXISTS rentals (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS transactions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  rental_id UUID REFERENCES rentals(id) ON DELETE CASCADE,
+  customer_id UUID NOT NULL REFERENCES users(id),
+  amount NUMERIC(12,2) NOT NULL,
+  method VARCHAR(30) NOT NULL DEFAULT 'OFFLINE',
+  status VARCHAR(30) NOT NULL DEFAULT 'RECORDED',
+  note TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS iot_devices (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   room_id UUID REFERENCES cultivation_rooms(id) ON DELETE SET NULL,
@@ -64,6 +75,8 @@ CREATE TABLE IF NOT EXISTS iot_devices (
   device_code VARCHAR(80) UNIQUE NOT NULL,
   device_type VARCHAR(40) NOT NULL DEFAULT 'ESP32',
   status VARCHAR(30) NOT NULL DEFAULT 'OFFLINE',
+  is_on BOOLEAN NOT NULL DEFAULT FALSE,
+  api_key TEXT,
   last_seen TIMESTAMPTZ
 );
 
@@ -89,6 +102,7 @@ CREATE INDEX IF NOT EXISTS idx_sensor_readings_sensor ON sensor_readings(sensor_
 CREATE TABLE IF NOT EXISTS cameras (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tray_id UUID REFERENCES cultivation_trays(id) ON DELETE SET NULL,
+  room_id UUID REFERENCES cultivation_rooms(id) ON DELETE SET NULL,
   name VARCHAR(100) NOT NULL,
   stream_url TEXT,
   status VARCHAR(30) NOT NULL DEFAULT 'OFFLINE',
@@ -107,6 +121,7 @@ CREATE TABLE IF NOT EXISTS cultivation_progress (
 CREATE TABLE IF NOT EXISTS harvests (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tray_id UUID NOT NULL REFERENCES cultivation_trays(id),
+  customer_id UUID REFERENCES users(id) ON DELETE SET NULL,
   quantity_kg NUMERIC(10,2),
   harvest_date DATE NOT NULL DEFAULT CURRENT_DATE,
   delivery_requested BOOLEAN NOT NULL DEFAULT FALSE,
@@ -134,3 +149,8 @@ CREATE TABLE IF NOT EXISTS environment_thresholds (
   co2_max NUMERIC(10,2) DEFAULT 800,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS environment_thresholds_room_uidx
+  ON environment_thresholds(room_id) WHERE room_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS environment_thresholds_global_uidx
+  ON environment_thresholds((1)) WHERE room_id IS NULL;

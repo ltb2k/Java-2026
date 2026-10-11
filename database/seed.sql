@@ -2,23 +2,82 @@ INSERT INTO roles(name) VALUES
 ('ADMIN'), ('FARM_OPERATOR'), ('CUSTOMER')
 ON CONFLICT (name) DO NOTHING;
 
+INSERT INTO users(full_name, email, password_hash, role_id, phone, is_active)
+SELECT 'Shared Team Administrator', 'admin@mushroom.local',
+  '$2a$10$3GhxMOjg/mN8YDA1D8uptet8vCWFTiEbqXsGVgVR95ddKUkowoyhi', r.id, NULL, TRUE
+FROM roles r WHERE r.name='ADMIN'
+ON CONFLICT (email) DO NOTHING;
+
+INSERT INTO users(full_name, email, password_hash, role_id, phone, is_active)
+SELECT 'Nguyen Van Operator', 'operator@mushroom.local',
+  '$2a$10$GNF9WFSWo3w953bJUza6TO3RVtieo./phgmtPIJ5fz5hw61O7RNKO', r.id, '0900000002', TRUE
+FROM roles r WHERE r.name='FARM_OPERATOR'
+ON CONFLICT (email) DO NOTHING;
+
+INSERT INTO users(full_name, email, password_hash, role_id, phone, is_active)
+SELECT 'Tran Van B', 'customer@mushroom.local',
+  '$2a$10$ec0WHMrM9Gff6tbAytFR.udraCTqN8OMLH1cVKf0q6PvuYIDMbMLi', r.id, '0900000003', TRUE
+FROM roles r WHERE r.name='CUSTOMER'
+ON CONFLICT (email) DO NOTHING;
+
 INSERT INTO cultivation_rooms(name, code, location)
 VALUES ('Phòng trồng 01','ROOM-01','Khu A')
 ON CONFLICT (code) DO NOTHING;
+
+INSERT INTO environment_thresholds(room_id, temperature_min, temperature_max, humidity_min, humidity_max, co2_max)
+SELECT id, 24, 28, 85, 95, 800 FROM cultivation_rooms WHERE code='ROOM-01'
+ON CONFLICT DO NOTHING;
 
 INSERT INTO rental_packages(name,duration_days,price,description)
 VALUES
 ('Gói 30 ngày',30,1500000,'Thuê 1 khay trong 30 ngày'),
 ('Gói 60 ngày',60,2700000,'Thuê 1 khay trong 60 ngày')
-ON CONFLICT DO NOTHING;
+ON CONFLICT (name) DO NOTHING;
 
 INSERT INTO cultivation_trays(room_id,code,mushroom_type,rack,status,growth_day,expected_harvest_date)
 SELECT id,'TRAY-A101','Nấm Bào Ngư Xám','Kệ 03','RENTED',14,CURRENT_DATE+16
 FROM cultivation_rooms WHERE code='ROOM-01'
 ON CONFLICT (code) DO NOTHING;
 
-INSERT INTO iot_devices(room_id,name,device_code,status,last_seen)
-SELECT id,'ESP32 Room 01','ESP32-ROOM-01','ONLINE',NOW()
+INSERT INTO cultivation_trays(room_id,code,mushroom_type,rack,status,growth_day)
+SELECT id,'TRAY-A102','Nấm Bào Ngư Trắng','Kệ 04','AVAILABLE',0
+FROM cultivation_rooms WHERE code='ROOM-01'
+ON CONFLICT (code) DO NOTHING;
+
+INSERT INTO rentals(customer_id, tray_id, package_id, end_date, status)
+SELECT u.id, t.id, p.id, CURRENT_DATE + 16, 'ACTIVE'
+FROM users u, cultivation_trays t, rental_packages p
+WHERE u.email='customer@mushroom.local' AND t.code='TRAY-A101' AND p.name='Gói 30 ngày'
+AND NOT EXISTS (SELECT 1 FROM rentals r WHERE r.tray_id=t.id AND r.status='ACTIVE');
+
+INSERT INTO transactions(rental_id, customer_id, amount, note)
+SELECT rent.id, rent.customer_id, p.price, 'Seed demo rental'
+FROM rentals rent
+JOIN rental_packages p ON p.id=rent.package_id
+WHERE NOT EXISTS (SELECT 1 FROM transactions tx WHERE tx.rental_id=rent.id);
+
+INSERT INTO iot_devices(room_id,name,device_code,device_type,status,is_on,api_key,last_seen)
+SELECT id,'ESP32 Room 01','ESP32-ROOM-01','ESP32','ONLINE',TRUE,'demo-iot-key',NOW()
+FROM cultivation_rooms WHERE code='ROOM-01'
+ON CONFLICT (device_code) DO NOTHING;
+
+INSERT INTO iot_devices(room_id,name,device_code,device_type,status,is_on)
+SELECT id,'Bơm phun sương','ACT-MIST-01','MIST','ONLINE',FALSE
+FROM cultivation_rooms WHERE code='ROOM-01'
+ON CONFLICT (device_code) DO NOTHING;
+
+INSERT INTO iot_devices(room_id,name,device_code,device_type,status,is_on)
+SELECT id,'Quạt thông gió','ACT-FAN-01','FAN','ONLINE',FALSE
+FROM cultivation_rooms WHERE code='ROOM-01'
+ON CONFLICT (device_code) DO NOTHING;
+
+INSERT INTO iot_devices(room_id,name,device_code,device_type,status,is_on)
+SELECT id,'Đèn LED','ACT-LED-01','LED','ONLINE',TRUE
+FROM cultivation_rooms WHERE code='ROOM-01'
+ON CONFLICT (device_code) DO NOTHING;
+
+INSERT INTO iot_devices(room_id,name,device_code,device_type,status,is_on)
+SELECT id,'Hệ thống sưởi','ACT-HEAT-01','HEATER','OFFLINE',FALSE
 FROM cultivation_rooms WHERE code='ROOM-01'
 ON CONFLICT (device_code) DO NOTHING;
 
@@ -38,3 +97,13 @@ INSERT INTO cameras(tray_id,name,stream_url,status)
 SELECT id,'Camera TRAY-A101','', 'ONLINE'
 FROM cultivation_trays WHERE code='TRAY-A101'
 AND NOT EXISTS (SELECT 1 FROM cameras c JOIN cultivation_trays t ON t.id=c.tray_id WHERE t.code='TRAY-A101');
+
+INSERT INTO cultivation_progress(tray_id,stage,progress_percent,note)
+SELECT id,'Ra quả thể',70,'Giai đoạn phát triển mũ nấm'
+FROM cultivation_trays WHERE code='TRAY-A101'
+AND NOT EXISTS (SELECT 1 FROM cultivation_progress p JOIN cultivation_trays t ON t.id=p.tray_id WHERE t.code='TRAY-A101');
+
+INSERT INTO notifications(user_id,title,message,type)
+SELECT u.id,'Chào mừng khách hàng','Khay TRAY-A101 đã được liên kết với tài khoản của bạn.','INFO'
+FROM users u WHERE u.email='customer@mushroom.local'
+AND NOT EXISTS (SELECT 1 FROM notifications n WHERE n.user_id=u.id AND n.title='Chào mừng khách hàng');
