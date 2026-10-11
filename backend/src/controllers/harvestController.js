@@ -18,7 +18,7 @@ exports.list = async (req, res) => {
       ${where}
       ORDER BY h.harvest_date DESC`, params);
     res.json(r.rows);
-  } catch (e) { res.status(500).json({ message: e.message }); }
+  } catch (e) { console.error("Controller request failed", { code: e.code || "UNKNOWN" }); return res.status(500).json({ message: "Internal server error" }); }
 };
 
 exports.create = async (req, res) => {
@@ -32,7 +32,7 @@ exports.create = async (req, res) => {
       VALUES($1,$2,$3,COALESCE($4,CURRENT_DATE),$5,$6,$7) RETURNING *`,
       [trayId, customerId, quantityKg || null, harvestDate || null, !!deliveryRequested, note || null, status || "PLANNED"]);
     res.status(201).json(r.rows[0]);
-  } catch (e) { res.status(400).json({ message: e.message }); }
+  } catch (e) { console.error("Controller request failed", { code: e.code || "UNKNOWN" }); return res.status(500).json({ message: "Internal server error" }); }
 };
 
 exports.update = async (req, res) => {
@@ -51,7 +51,7 @@ exports.update = async (req, res) => {
       await pool.query("UPDATE cultivation_trays SET status='HARVESTED' WHERE id=$1", [r.rows[0].tray_id]);
     }
     res.json(r.rows[0]);
-  } catch (e) { res.status(400).json({ message: e.message }); }
+  } catch (e) { console.error("Controller request failed", { code: e.code || "UNKNOWN" }); return res.status(500).json({ message: "Internal server error" }); }
 };
 
 exports.requestCollection = async (req, res) => {
@@ -70,5 +70,5 @@ exports.requestCollection = async (req, res) => {
     await notifyUsers(await staffIds(), "Yêu cầu thu hoạch",
       `Khách hàng yêu cầu thu hoạch khay ${trayId}.`, "HARVEST");
     res.status(201).json(r.rows[0]);
-  } catch (e) { res.status(400).json({ message: e.message }); }
+  } catch (e) { console.error("Controller request failed", { code: e.code || "UNKNOWN" }); return res.status(500).json({ message: "Internal server error" }); }
 };

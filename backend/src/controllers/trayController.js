@@ -29,7 +29,7 @@ exports.list = async (req, res) => {
     sql += " ORDER BY t.created_at DESC";
     const r = await pool.query(sql, params);
     res.json(r.rows);
-  } catch (e) { res.status(500).json({ message: e.message }); }
+  } catch (e) { console.error("Controller request failed", { code: e.code || "UNKNOWN" }); return res.status(500).json({ message: "Internal server error" }); }
 };
 
 exports.get = async (req, res) => {
@@ -46,7 +46,7 @@ exports.get = async (req, res) => {
       if (!own.rowCount) return res.status(403).json({ message: "Forbidden" });
     }
     res.json(r.rows[0]);
-  } catch (e) { res.status(500).json({ message: e.message }); }
+  } catch (e) { console.error("Controller request failed", { code: e.code || "UNKNOWN" }); return res.status(500).json({ message: "Internal server error" }); }
 };
 
 exports.create = async (req, res) => {
@@ -57,7 +57,7 @@ exports.create = async (req, res) => {
       VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
       [roomId || null, code, mushroomType, rack || null, status || "AVAILABLE", growthDay || 0, expectedHarvestDate || null]);
     res.status(201).json(r.rows[0]);
-  } catch (e) { res.status(400).json({ message: e.message }); }
+  } catch (e) { console.error("Controller request failed", { code: e.code || "UNKNOWN" }); return res.status(500).json({ message: "Internal server error" }); }
 };
 
 exports.update = async (req, res) => {
@@ -72,7 +72,7 @@ exports.update = async (req, res) => {
       [status || null, growthDay ?? null, expectedHarvestDate || null, roomId || null, mushroomType || null, rack ?? null, req.params.id]);
     if (!r.rowCount) return res.status(404).json({ message: "Tray not found" });
     res.json(r.rows[0]);
-  } catch (e) { res.status(400).json({ message: e.message }); }
+  } catch (e) { console.error("Controller request failed", { code: e.code || "UNKNOWN" }); return res.status(500).json({ message: "Internal server error" }); }
 };
 
 exports.remove = async (req, res) => {
@@ -80,7 +80,7 @@ exports.remove = async (req, res) => {
     const r = await pool.query("DELETE FROM cultivation_trays WHERE id=$1 RETURNING id", [req.params.id]);
     if (!r.rowCount) return res.status(404).json({ message: "Tray not found" });
     res.json({ deleted: true });
-  } catch (e) { res.status(400).json({ message: e.message }); }
+  } catch (e) { console.error("Controller request failed", { code: e.code || "UNKNOWN" }); return res.status(500).json({ message: "Internal server error" }); }
 };
 
 exports.registerCode = async (req, res) => {
@@ -111,5 +111,5 @@ exports.registerCode = async (req, res) => {
       "INSERT INTO transactions(rental_id,customer_id,amount,note) VALUES($1,$2,$3,$4)",
       [rental.rows[0].id, req.user.id, pkg.rows[0].price, "Tray code registration"]);
     res.status(201).json({ tray: { ...t, status: "RENTED" }, rental: rental.rows[0], linked: false });
-  } catch (e) { res.status(400).json({ message: e.message }); }
+  } catch (e) { console.error("Controller request failed", { code: e.code || "UNKNOWN" }); return res.status(500).json({ message: "Internal server error" }); }
 };

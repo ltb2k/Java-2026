@@ -29,7 +29,7 @@ exports.summary = async (req, res) => {
         GROUP BY s.sensor_type`)
     ]);
     res.json({ rentals: rentals.rows[0], harvests: harvests.rows[0], environment: env.rows });
-  } catch (e) { res.status(500).json({ message: e.message }); }
+  } catch (e) { console.error("Controller request failed", { code: e.code || "UNKNOWN" }); return res.status(500).json({ message: "Internal server error" }); }
 };
 
 exports.exportCsv = async (req, res) => {
@@ -55,5 +55,5 @@ exports.exportCsv = async (req, res) => {
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
     res.setHeader("Content-Disposition", `attachment; filename=${type}.csv`);
     res.send(csv(rows));
-  } catch (e) { res.status(500).json({ message: e.message }); }
+  } catch (e) { console.error("Controller request failed", { code: e.code || "UNKNOWN" }); return res.status(500).json({ message: "Internal server error" }); }
 };

@@ -16,7 +16,7 @@ exports.list = async (req, res) => {
       ${where}
       ORDER BY rent.created_at DESC`, params);
     res.json(r.rows);
-  } catch (e) { res.status(500).json({ message: e.message }); }
+  } catch (e) { console.error("Controller request failed", { code: e.code || "UNKNOWN" }); return res.status(500).json({ message: "Internal server error" }); }
 };
 
 exports.create = async (req, res) => {
@@ -39,7 +39,7 @@ exports.create = async (req, res) => {
       "INSERT INTO transactions(rental_id,customer_id,amount,note) VALUES($1,$2,$3,$4)",
       [rental.rows[0].id, customerId, pkg.rows[0].price, "Rental payment recorded offline"]);
     res.status(201).json(rental.rows[0]);
-  } catch (e) { res.status(400).json({ message: e.message }); }
+  } catch (e) { console.error("Controller request failed", { code: e.code || "UNKNOWN" }); return res.status(500).json({ message: "Internal server error" }); }
 };
 
 exports.update = async (req, res) => {
@@ -53,7 +53,7 @@ exports.update = async (req, res) => {
       await pool.query("UPDATE cultivation_trays SET status='AVAILABLE' WHERE id=$1", [r.rows[0].tray_id]);
     }
     res.json(r.rows[0]);
-  } catch (e) { res.status(400).json({ message: e.message }); }
+  } catch (e) { console.error("Controller request failed", { code: e.code || "UNKNOWN" }); return res.status(500).json({ message: "Internal server error" }); }
 };
 
 exports.transactions = async (req, res) => {
@@ -71,5 +71,5 @@ exports.transactions = async (req, res) => {
       ${where}
       ORDER BY tx.created_at DESC`, params);
     res.json(r.rows);
-  } catch (e) { res.status(500).json({ message: e.message }); }
+  } catch (e) { console.error("Controller request failed", { code: e.code || "UNKNOWN" }); return res.status(500).json({ message: "Internal server error" }); }
 };

@@ -12,7 +12,7 @@ exports.list = async (req, res) => {
       JOIN cultivation_trays t ON t.id=p.tray_id ${where}
       ORDER BY p.recorded_at DESC LIMIT 200`, params);
     res.json(r.rows);
-  } catch (e) { res.status(500).json({ message: e.message }); }
+  } catch (e) { console.error("Controller request failed", { code: e.code || "UNKNOWN" }); return res.status(500).json({ message: "Internal server error" }); }
 };
 
 exports.create = async (req, res) => {
@@ -32,5 +32,5 @@ exports.create = async (req, res) => {
       `Khay đã chuyển sang giai đoạn: ${stage} (${progressPercent || 0}%).`,
       "PROGRESS");
     res.status(201).json(r.rows[0]);
-  } catch (e) { res.status(400).json({ message: e.message }); }
+  } catch (e) { console.error("Controller request failed", { code: e.code || "UNKNOWN" }); return res.status(500).json({ message: "Internal server error" }); }
 };

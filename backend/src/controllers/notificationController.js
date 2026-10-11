@@ -6,7 +6,7 @@ exports.list = async (req, res) => {
       "SELECT * FROM notifications WHERE user_id=$1 ORDER BY created_at DESC LIMIT 50",
       [req.user.id]);
     res.json(r.rows);
-  } catch (e) { res.status(500).json({ message: e.message }); }
+  } catch (e) { console.error("Controller request failed", { code: e.code || "UNKNOWN" }); return res.status(500).json({ message: "Internal server error" }); }
 };
 
 exports.read = async (req, res) => {
@@ -15,12 +15,12 @@ exports.read = async (req, res) => {
       "UPDATE notifications SET is_read=true WHERE id=$1 AND user_id=$2 RETURNING *",
       [req.params.id, req.user.id]);
     res.json(r.rows[0] || null);
-  } catch (e) { res.status(500).json({ message: e.message }); }
+  } catch (e) { console.error("Controller request failed", { code: e.code || "UNKNOWN" }); return res.status(500).json({ message: "Internal server error" }); }
 };
 
 exports.readAll = async (req, res) => {
   try {
     await pool.query("UPDATE notifications SET is_read=true WHERE user_id=$1", [req.user.id]);
     res.json({ ok: true });
-  } catch (e) { res.status(500).json({ message: e.message }); }
+  } catch (e) { console.error("Controller request failed", { code: e.code || "UNKNOWN" }); return res.status(500).json({ message: "Internal server error" }); }
 };

@@ -2,23 +2,8 @@ INSERT INTO roles(name) VALUES
 ('ADMIN'), ('FARM_OPERATOR'), ('CUSTOMER')
 ON CONFLICT (name) DO NOTHING;
 
-INSERT INTO users(full_name, email, password_hash, role_id, phone, is_active)
-SELECT 'Shared Team Administrator', 'admin@mushroom.local',
-  '$2a$10$3GhxMOjg/mN8YDA1D8uptet8vCWFTiEbqXsGVgVR95ddKUkowoyhi', r.id, NULL, TRUE
-FROM roles r WHERE r.name='ADMIN'
-ON CONFLICT (email) DO NOTHING;
 
-INSERT INTO users(full_name, email, password_hash, role_id, phone, is_active)
-SELECT 'Nguyen Van Operator', 'operator@mushroom.local',
-  '$2a$10$GNF9WFSWo3w953bJUza6TO3RVtieo./phgmtPIJ5fz5hw61O7RNKO', r.id, '0900000002', TRUE
-FROM roles r WHERE r.name='FARM_OPERATOR'
-ON CONFLICT (email) DO NOTHING;
 
-INSERT INTO users(full_name, email, password_hash, role_id, phone, is_active)
-SELECT 'Tran Van B', 'customer@mushroom.local',
-  '$2a$10$ec0WHMrM9Gff6tbAytFR.udraCTqN8OMLH1cVKf0q6PvuYIDMbMLi', r.id, '0900000003', TRUE
-FROM roles r WHERE r.name='CUSTOMER'
-ON CONFLICT (email) DO NOTHING;
 
 INSERT INTO cultivation_rooms(name, code, location)
 VALUES ('Phòng trồng 01','ROOM-01','Khu A')
@@ -56,8 +41,8 @@ FROM rentals rent
 JOIN rental_packages p ON p.id=rent.package_id
 WHERE NOT EXISTS (SELECT 1 FROM transactions tx WHERE tx.rental_id=rent.id);
 
-INSERT INTO iot_devices(room_id,name,device_code,device_type,status,is_on,api_key,last_seen)
-SELECT id,'ESP32 Room 01','ESP32-ROOM-01','ESP32','ONLINE',TRUE,'demo-iot-key',NOW()
+INSERT INTO iot_devices(room_id,name,device_code,device_type,status,is_on,last_seen)
+SELECT id,'ESP32 Room 01','ESP32-ROOM-01','ESP32','ONLINE',TRUE,NOW()
 FROM cultivation_rooms WHERE code='ROOM-01'
 ON CONFLICT (device_code) DO NOTHING;
 

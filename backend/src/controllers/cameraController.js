@@ -16,7 +16,7 @@ exports.list = async (req, res) => {
       SELECT c.*, t.code tray_code, rm.name room_name ${join} ${where}
       ORDER BY c.created_at DESC`, params);
     res.json(r.rows);
-  } catch (e) { res.status(500).json({ message: e.message }); }
+  } catch (e) { console.error("Controller request failed", { code: e.code || "UNKNOWN" }); return res.status(500).json({ message: "Internal server error" }); }
 };
 
 exports.create = async (req, res) => {
@@ -27,7 +27,7 @@ exports.create = async (req, res) => {
       VALUES($1,$2,$3,$4,$5) RETURNING *`,
       [trayId || null, roomId || null, name, streamUrl || null, status || "OFFLINE"]);
     res.status(201).json(r.rows[0]);
-  } catch (e) { res.status(400).json({ message: e.message }); }
+  } catch (e) { console.error("Controller request failed", { code: e.code || "UNKNOWN" }); return res.status(500).json({ message: "Internal server error" }); }
 };
 
 exports.update = async (req, res) => {
@@ -41,7 +41,7 @@ exports.update = async (req, res) => {
       [name || null, streamUrl ?? null, status || null, trayId || null, roomId || null, req.params.id]);
     if (!r.rowCount) return res.status(404).json({ message: "Camera not found" });
     res.json(r.rows[0]);
-  } catch (e) { res.status(400).json({ message: e.message }); }
+  } catch (e) { console.error("Controller request failed", { code: e.code || "UNKNOWN" }); return res.status(500).json({ message: "Internal server error" }); }
 };
 
 exports.remove = async (req, res) => {
@@ -49,5 +49,5 @@ exports.remove = async (req, res) => {
     const r = await pool.query("DELETE FROM cameras WHERE id=$1 RETURNING id", [req.params.id]);
     if (!r.rowCount) return res.status(404).json({ message: "Camera not found" });
     res.json({ deleted: true });
-  } catch (e) { res.status(400).json({ message: e.message }); }
+  } catch (e) { console.error("Controller request failed", { code: e.code || "UNKNOWN" }); return res.status(500).json({ message: "Internal server error" }); }
 };

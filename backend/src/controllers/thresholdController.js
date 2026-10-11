@@ -8,7 +8,7 @@ exports.list = async (req, res) => {
       LEFT JOIN cultivation_rooms rm ON rm.id=t.room_id
       ORDER BY rm.name NULLS FIRST`);
     res.json(r.rows);
-  } catch (e) { res.status(500).json({ message: e.message }); }
+  } catch (e) { console.error("Controller request failed", { code: e.code || "UNKNOWN" }); return res.status(500).json({ message: "Internal server error" }); }
 };
 
 exports.upsert = async (req, res) => {
@@ -39,5 +39,5 @@ exports.upsert = async (req, res) => {
         [roomId || null, temperatureMin ?? 24, temperatureMax ?? 28, humidityMin ?? 85, humidityMax ?? 95, co2Max ?? 800]);
     }
     res.json(r.rows[0]);
-  } catch (e) { res.status(400).json({ message: e.message }); }
+  } catch (e) { console.error("Controller request failed", { code: e.code || "UNKNOWN" }); return res.status(500).json({ message: "Internal server error" }); }
 };

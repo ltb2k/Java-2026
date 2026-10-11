@@ -91,8 +91,7 @@ function Login({ onLogin }) {
         <button type="button" className="secondary full" onClick={() => { setMode(mode === "login" ? "register" : "login"); setErr(""); setNotice(""); }}>
           {mode === "login" ? "Chưa có tài khoản? Đăng ký thành viên" : "Đã có tài khoản? Quay lại đăng nhập"}
         </button>
-        {mode === "login" && <small>Demo: admin@mushroom.local / Admin@123 · operator@mushroom.local / Operator@123 · customer@mushroom.local / Customer@123</small>}
-        <small>Tài khoản đăng ký mới có quyền CUSTOMER. Admin/Operator do quản trị tạo.</small>
+        {mode === "login" && <small>Tài khoản đăng ký mới có quyền CUSTOMER. Tài khoản quản trị do quản trị viên tạo.</small>}
       </form>
     </div>
   );
@@ -109,14 +108,44 @@ function SensorCard({ Icon, title, value, unit, note, cls }) {
 }
 
 function App() {
-  const [user, setUser] = useState(() => { try { return JSON.parse(localStorage.getItem("user")); } catch { return null; } });
+  const [user, setUser] = useState(null);
+  const [authChecking, setAuthChecking] = useState(() => Boolean(localStorage.getItem("token")));
   const [page, setPage] = useState("dashboard");
   const [sidebar, setSidebar] = useState(true);
   const [toast, setToast] = useState("");
   const [refresh, setRefresh] = useState(0);
-  if (!user) return <Login onLogin={setUser} />;
-  const logout = () => { localStorage.clear(); setUser(null); };
+  useEffect(() => {
+    let active = true;
+    const clearSession = () => {
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      if (active) { setUser(null); setAuthChecking(false); }
+    };
+    window.addEventListener("auth:expired", clearSession);
+    if (localStorage.getItem("token")) {
+      api.me().then((current) => {
+        if (!active) return;
+        setUser(current);
+        localStorage.setItem("user", JSON.stringify(current));
+      }).catch(clearSession).finally(() => {
+        if (active) setAuthChecking(false);
+      });
+    } else {
+      setAuthChecking(false);
+    }
+    return () => {
+      active = false;
+      window.removeEventListener("auth:expired", clearSession);
+    };
+  }, []);
+  const logout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    setUser(null);
+  };
   const notify = (x) => { setToast(x); setTimeout(() => setToast(""), 2500); };
+  if (authChecking) return <div className="login"><p>Đang kiểm tra phiên đăng nhập...</p></div>;
+  if (!user) return <Login onLogin={(current) => { setUser(current); setAuthChecking(false); }} />;
   const menu = allMenu.filter((item) => canSee(item, user.role));
   return (
     <div className="app">

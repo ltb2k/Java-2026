@@ -38,5 +38,5 @@ exports.summary = async (req, res) => {
       current: readings.rows[0],
       featured: featured.rows[0] || null
     });
-  } catch (e) { res.status(500).json({ message: e.message }); }
+  } catch (e) { console.error("Controller request failed", { code: e.code || "UNKNOWN" }); return res.status(500).json({ message: "Internal server error" }); }
 };

@@ -1,15 +1,22 @@
 services:
   postgres:
     image: postgres:16
-    container_name: mushroom-postgres
     restart: unless-stopped
     environment:
       POSTGRES_DB: mushroom_iot
       POSTGRES_USER: mushroom
-      POSTGRES_PASSWORD: mushroom123
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the root .env file}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - mushroom_pgdata:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./database/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
 volumes:
   mushroom_pgdata:

@@ -41,7 +41,7 @@ exports.latest = async (req, res) => {
       LEFT JOIN cultivation_trays t ON t.id=sr.tray_id
       ORDER BY s.sensor_type,sr.recorded_at DESC`);
     res.json(r.rows);
-  } catch (e) { res.status(500).json({ message: e.message }); }
+  } catch (e) { console.error("Controller request failed", { code: e.code || "UNKNOWN" }); return res.status(500).json({ message: "Internal server error" }); }
 };
 
 exports.history = async (req, res) => {
@@ -54,18 +54,25 @@ exports.history = async (req, res) => {
       WHERE sr.recorded_at >= NOW()-($1||' hours')::interval
       ORDER BY sr.recorded_at ASC`, [hours]);
     res.json(r.rows);
-  } catch (e) { res.status(500).json({ message: e.message }); }
+  } catch (e) { console.error("Controller request failed", { code: e.code || "UNKNOWN" }); return res.status(500).json({ message: "Internal server error" }); }
 };
 
 exports.ingest = async (req, res) => {
   try {
-    const { deviceCode, temperature, humidity, co2, trayCode } = req.body;
+    const body = req.body || {};
+    const { deviceCode, temperature, humidity, co2, trayCode } = body;
+    if (typeof deviceCode !== "string" || !deviceCode.trim() ||
+        [temperature, humidity, co2].some((value) => value != null && (typeof value !== "number" || !Number.isFinite(value))) ||
+        (trayCode != null && typeof trayCode !== "string")) {
+      return res.status(400).json({ message: "Invalid sensor payload" });
+    }
     const d = await pool.query("SELECT * FROM iot_devices WHERE device_code=$1", [deviceCode]);
     if (!d.rowCount) return res.status(404).json({ message: "Unknown device" });
     const device = d.rows[0];
     const providedKey = req.headers["x-device-key"] || req.body.apiKey;
     const expected = device.api_key || process.env.IOT_INGEST_KEY;
-    if (expected && providedKey !== expected) {
+    if (!expected) return res.status(503).json({ message: "Device authentication is not configured" });
+    if (typeof providedKey !== "string" || providedKey !== expected) {
       return res.status(401).json({ message: "Invalid device key" });
     }
     const tray = trayCode
@@ -99,5 +106,5 @@ exports.ingest = async (req, res) => {
       ? await applyAutoControl(device.room_id, { temperature, humidity, co2 }, th)
       : [];
     res.status(201).json({ message: "Sensor data accepted", alerts, actuators });
-  } catch (e) { res.status(400).json({ message: e.message }); }
+  } catch (e) { console.error("Controller request failed", { code: e.code || "UNKNOWN" }); return res.status(500).json({ message: "Internal server error" }); }
 };

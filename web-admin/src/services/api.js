@@ -1,4 +1,4 @@
-const API = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+const API = (import.meta.env.VITE_API_URL || "http://localhost:5000/api").replace(/\/+$/, "");
 
 export async function api(path, options = {}) {
   const token = localStorage.getItem("token");
@@ -7,9 +7,17 @@ export async function api(path, options = {}) {
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(options.headers || {})
   };
-  const res = await fetch(API + path, { ...options, headers });
+  let res;
+  try {
+    res = await fetch(API + path, { ...options, headers });
+  } catch {
+    throw new Error("Không thể kết nối máy chủ. Kiểm tra backend và cấu hình API.");
+  }
   if (options.raw) return res;
   const data = await res.json().catch(() => ({}));
+  if (res.status === 401 && path !== "/auth/login" && path !== "/auth/register") {
+    window.dispatchEvent(new Event("auth:expired"));
+  }
   if (!res.ok) throw new Error(data.message || `HTTP ${res.status}`);
   return data;
 }

@@ -28,7 +28,13 @@ const pool = require("../src/config/db");
     );
     console.log(`Shared admin account is ready for ${email}. Never share ADMIN_PASSWORD in chat or commit it to Git.`);
   } catch (err) {
-    console.error(err.message);
+    const safeMessages = [
+      "Set ADMIN_PASSWORD (at least 12 characters) in backend/.env or hosting environment before running seed:admin.",
+      "ADMIN role missing. Run database/schema.sql and database/seed.sql first."
+    ];
+    console.error(safeMessages.includes(err.message)
+      ? err.message
+      : "Admin setup failed. Check database availability and local configuration.");
     process.exitCode = 1;
   } finally {
     await pool.end();

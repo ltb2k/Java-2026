@@ -7,7 +7,7 @@ exports.list = async (req, res) => {
         (SELECT COUNT(*)::int FROM cultivation_trays t WHERE t.room_id=rm.id) tray_count
       FROM cultivation_rooms rm ORDER BY rm.created_at DESC`);
     res.json(r.rows);
-  } catch (e) { res.status(500).json({ message: e.message }); }
+  } catch (e) { console.error("Controller request failed", { code: e.code || "UNKNOWN" }); return res.status(500).json({ message: "Internal server error" }); }
 };
 
 exports.create = async (req, res) => {
@@ -20,7 +20,7 @@ exports.create = async (req, res) => {
       `INSERT INTO environment_thresholds(room_id) VALUES($1)
        ON CONFLICT DO NOTHING`, [r.rows[0].id]).catch(() => {});
     res.status(201).json(r.rows[0]);
-  } catch (e) { res.status(400).json({ message: e.message }); }
+  } catch (e) { console.error("Controller request failed", { code: e.code || "UNKNOWN" }); return res.status(500).json({ message: "Internal server error" }); }
 };
 
 exports.update = async (req, res) => {
@@ -34,7 +34,7 @@ exports.update = async (req, res) => {
       [name || null, code || null, location ?? null, status || null, req.params.id]);
     if (!r.rowCount) return res.status(404).json({ message: "Room not found" });
     res.json(r.rows[0]);
-  } catch (e) { res.status(400).json({ message: e.message }); }
+  } catch (e) { console.error("Controller request failed", { code: e.code || "UNKNOWN" }); return res.status(500).json({ message: "Internal server error" }); }
 };
 
 exports.remove = async (req, res) => {
@@ -42,5 +42,5 @@ exports.remove = async (req, res) => {
     const r = await pool.query("DELETE FROM cultivation_rooms WHERE id=$1 RETURNING id", [req.params.id]);
     if (!r.rowCount) return res.status(404).json({ message: "Room not found" });
     res.json({ deleted: true });
-  } catch (e) { res.status(400).json({ message: e.message }); }
+  } catch (e) { console.error("Controller request failed", { code: e.code || "UNKNOWN" }); return res.status(500).json({ message: "Internal server error" }); }
 };
