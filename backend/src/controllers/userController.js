@@ -31,7 +31,7 @@ exports.create = async (req, res) => {
     }
     const roleRow = await pool.query("SELECT id FROM roles WHERE name=$1", [role]);
     if (!roleRow.rowCount) return res.status(400).json({ message: "Role không hợp lệ" });
-    const hash = await bcrypt.hash(password, 10);
+    const hash = await bcrypt.hash(password, 12);
     const r = await pool.query(`
       INSERT INTO users(full_name,email,password_hash,role_id,phone)
       VALUES($1,$2,$3,$4,$5)
@@ -58,7 +58,7 @@ exports.update = async (req, res) => {
       if (!roleRow.rowCount) return res.status(400).json({ message: "Role không hợp lệ" });
       roleId = roleRow.rows[0].id;
     }
-    const hash = password ? await bcrypt.hash(password, 10) : null;
+    const hash = password ? await bcrypt.hash(password, 12) : null;
     const r = await pool.query(`
       UPDATE users SET
         full_name=COALESCE($1,full_name),

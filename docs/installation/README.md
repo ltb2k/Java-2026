@@ -1,8 +1,10 @@
 # Installation
-1. Start PostgreSQL with Docker or install PostgreSQL.
-2. Execute database/schema.sql and database/seed.sql.
-3. Copy backend/.env.example to backend/.env.
-4. Run `npm install` and `npm run seed:admin` in backend.
-5. Run `npm run dev`.
-6. Run web-admin with `npm install && npm run dev`.
-7. For Flutter, install Flutter SDK and run `flutter pub get`, then `flutter run`.
+
+Use the root `README.md` and `HUONG_DAN_CHAY.md` as the current Windows setup instructions.
+
+1. Start PostgreSQL with `docker compose up -d postgres` from the repository root.
+2. On a new Docker volume, Compose applies `database/schema.sql` and `database/seed.sql` once. Do not rerun them against an existing database.
+3. Copy each `.env.example` only when its local `.env` does not exist, then configure private values locally.
+4. Run `npm ci` and `npm run dev` in `backend`, then `npm ci` and `npm run dev` in `web-admin`.
+5. Create an administrator only when required and only after confirming the local target database.
+6. Flutter requires its SDK, `flutter pub get`, `flutter analyze`, and `flutter run`.

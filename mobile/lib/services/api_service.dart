@@ -59,9 +59,15 @@ class ApiService {
 
   Future<Map<String, dynamic>?> currentUser() async {
     final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString('user');
-    if (raw == null) return null;
-    return jsonDecode(raw) as Map<String, dynamic>;
+    if (prefs.getString('token') == null) return null;
+    try {
+      final user = await me();
+      await prefs.setString('user', jsonEncode(user));
+      return user;
+    } catch (_) {
+      await logout();
+      return null;
+    }
   }
 
   Future<void> logout() async {

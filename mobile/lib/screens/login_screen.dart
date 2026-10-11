@@ -66,8 +66,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 onPressed: () => setState(() { register = !register; error = null; }),
                 child: Text(register ? 'Đã có tài khoản? Đăng nhập' : 'Chưa có tài khoản? Đăng ký'),
               ),
-              const Text('Demo: customer@mushroom.local / Customer@123',
-                  textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: Colors.white54)),
             ],
           ),
         ),

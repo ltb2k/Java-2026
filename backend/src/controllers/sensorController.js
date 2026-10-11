@@ -35,11 +35,14 @@ async function applyAutoControl(roomId, values, th) {
 
 exports.latest = async (req, res) => {
   try {
+    const staff = req.user.role === "ADMIN" || req.user.role === "FARM_OPERATOR";
+    const params = staff ? [] : [req.user.id];
     const r = await pool.query(`
       SELECT DISTINCT ON (s.sensor_type) s.sensor_type,s.unit,sr.value,sr.recorded_at,t.code tray_code
       FROM sensor_readings sr JOIN sensors s ON s.id=sr.sensor_id
       LEFT JOIN cultivation_trays t ON t.id=sr.tray_id
-      ORDER BY s.sensor_type,sr.recorded_at DESC`);
+      ${staff ? "" : "WHERE EXISTS (SELECT 1 FROM rentals rent WHERE rent.tray_id=sr.tray_id AND rent.customer_id=$1 AND rent.status='ACTIVE')"}
+      ORDER BY s.sensor_type,sr.recorded_at DESC`, params);
     res.json(r.rows);
   } catch (e) { console.error("Controller request failed", { code: e.code || "UNKNOWN" }); return res.status(500).json({ message: "Internal server error" }); }
 };
@@ -47,12 +50,18 @@ exports.latest = async (req, res) => {
 exports.history = async (req, res) => {
   try {
     const hours = Number(req.query.hours || 24);
+    if (!Number.isFinite(hours) || hours <= 0 || hours > 24 * 31) {
+      return res.status(400).json({ message: "Thời gian truy vấn không hợp lệ" });
+    }
+    const staff = req.user.role === "ADMIN" || req.user.role === "FARM_OPERATOR";
+    const params = staff ? [hours] : [hours, req.user.id];
     const r = await pool.query(`
       SELECT s.sensor_type,s.unit,sr.value,sr.recorded_at,t.code tray_code
       FROM sensor_readings sr JOIN sensors s ON s.id=sr.sensor_id
       LEFT JOIN cultivation_trays t ON t.id=sr.tray_id
       WHERE sr.recorded_at >= NOW()-($1||' hours')::interval
-      ORDER BY sr.recorded_at ASC`, [hours]);
+      ${staff ? "" : "AND EXISTS (SELECT 1 FROM rentals rent WHERE rent.tray_id=sr.tray_id AND rent.customer_id=$2 AND rent.status='ACTIVE')"}
+      ORDER BY sr.recorded_at ASC`, params);
     res.json(r.rows);
   } catch (e) { console.error("Controller request failed", { code: e.code || "UNKNOWN" }); return res.status(500).json({ message: "Internal server error" }); }
 };

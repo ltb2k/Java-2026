@@ -84,32 +84,42 @@ exports.remove = async (req, res) => {
 };
 
 exports.registerCode = async (req, res) => {
+  let client;
   try {
     const { code, packageId } = req.body;
-    if (!code) return res.status(400).json({ message: "Thiếu mã khay" });
-    const tray = await pool.query("SELECT * FROM cultivation_trays WHERE upper(code)=upper($1)", [code]);
-    if (!tray.rowCount) return res.status(404).json({ message: "Không tìm thấy khay" });
+    if (typeof code !== "string" || !code.trim()) return res.status(400).json({ message: "Thiếu mã khay" });
+    client = await pool.connect();
+    await client.query("BEGIN");
+    const tray = await client.query("SELECT * FROM cultivation_trays WHERE upper(code)=upper($1) FOR UPDATE", [code.trim()]);
+    if (!tray.rowCount) throw Object.assign(new Error("Tray not found"), { status: 404, publicMessage: "Không tìm thấy khay" });
     const t = tray.rows[0];
-    const active = await pool.query(
+    const active = await client.query(
       "SELECT * FROM rentals WHERE tray_id=$1 AND status='ACTIVE' ORDER BY created_at DESC LIMIT 1", [t.id]);
     if (active.rowCount) {
       if (active.rows[0].customer_id !== req.user.id) {
-        return res.status(403).json({ message: "Khay đã được gán cho khách khác" });
+        throw Object.assign(new Error("Tray belongs to another customer"), { status: 403, publicMessage: "Khay đã được gán cho khách khác" });
       }
+      await client.query("COMMIT");
       return res.json({ tray: t, rental: active.rows[0], linked: true });
     }
-    if (!packageId) return res.status(400).json({ message: "Khay chưa thuê. Vui lòng chọn gói thuê." });
-    const pkg = await pool.query("SELECT * FROM rental_packages WHERE id=$1 AND is_active=true", [packageId]);
-    if (!pkg.rowCount) return res.status(400).json({ message: "Gói thuê không hợp lệ" });
+    if (typeof packageId !== "string" || !packageId) throw Object.assign(new Error("Package required"), { status: 400, publicMessage: "Khay chưa thuê. Vui lòng chọn gói thuê." });
+    const pkg = await client.query("SELECT * FROM rental_packages WHERE id=$1 AND is_active=true", [packageId]);
+    if (!pkg.rowCount) throw Object.assign(new Error("Invalid package"), { status: 400, publicMessage: "Gói thuê không hợp lệ" });
     const end = new Date();
     end.setDate(end.getDate() + pkg.rows[0].duration_days);
-    const rental = await pool.query(`
+    const rental = await client.query(`
       INSERT INTO rentals(customer_id,tray_id,package_id,end_date) VALUES($1,$2,$3,$4) RETURNING *`,
       [req.user.id, t.id, packageId, end.toISOString().slice(0, 10)]);
-    await pool.query("UPDATE cultivation_trays SET status='RENTED' WHERE id=$1", [t.id]);
-    await pool.query(
+    await client.query("UPDATE cultivation_trays SET status='RENTED' WHERE id=$1", [t.id]);
+    await client.query(
       "INSERT INTO transactions(rental_id,customer_id,amount,note) VALUES($1,$2,$3,$4)",
       [rental.rows[0].id, req.user.id, pkg.rows[0].price, "Tray code registration"]);
+    await client.query("COMMIT");
     res.status(201).json({ tray: { ...t, status: "RENTED" }, rental: rental.rows[0], linked: false });
-  } catch (e) { console.error("Controller request failed", { code: e.code || "UNKNOWN" }); return res.status(500).json({ message: "Internal server error" }); }
+  } catch (e) {
+    if (client) await client.query("ROLLBACK").catch(() => {});
+    if (e.status) return res.status(e.status).json({ message: e.publicMessage });
+    if (e.code === "23505") return res.status(409).json({ message: "Khay đã có hợp đồng đang hoạt động" });
+    console.error("Controller request failed", { code: e.code || "UNKNOWN" }); return res.status(500).json({ message: "Internal server error" });
+  } finally { client?.release(); }
 };

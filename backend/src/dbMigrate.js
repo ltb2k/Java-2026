@@ -32,6 +32,11 @@ async function migrate() {
   if (duplicateEmails.rowCount) {
     throw new Error("Duplicate emails differing only by case must be resolved before startup.");
   }
+  const duplicateActiveRentals = await pool.query(`
+    SELECT 1 FROM rentals WHERE status='ACTIVE' GROUP BY tray_id HAVING count(*) > 1 LIMIT 1`);
+  if (duplicateActiveRentals.rowCount) {
+    throw new Error("Duplicate active rentals for the same tray must be resolved before migration.");
+  }
 
   const client = await pool.connect();
   try {
@@ -42,6 +47,7 @@ async function migrate() {
       ALTER TABLE cameras ADD COLUMN IF NOT EXISTS room_id UUID REFERENCES cultivation_rooms(id) ON DELETE SET NULL;
       ALTER TABLE harvests ADD COLUMN IF NOT EXISTS customer_id UUID REFERENCES users(id) ON DELETE SET NULL;
       CREATE UNIQUE INDEX IF NOT EXISTS users_email_lower_uidx ON users (lower(email));
+      CREATE UNIQUE INDEX IF NOT EXISTS rentals_one_active_tray_uidx ON rentals (tray_id) WHERE status='ACTIVE';
       CREATE TABLE IF NOT EXISTS transactions (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         rental_id UUID REFERENCES rentals(id) ON DELETE CASCADE,

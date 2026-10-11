@@ -16,16 +16,18 @@ const pool = require("../src/config/db");
     if (!role.rowCount) throw new Error("ADMIN role missing. Run database/schema.sql and database/seed.sql first.");
 
     const hash = await bcrypt.hash(password, 12);
-    await pool.query(
-      `INSERT INTO users(full_name, email, password_hash, role_id, is_active)
-       VALUES($1, $2, $3, $4, TRUE)
-       ON CONFLICT(email) DO UPDATE SET
-         full_name = EXCLUDED.full_name,
-         password_hash = EXCLUDED.password_hash,
-         role_id = EXCLUDED.role_id,
-         is_active = TRUE`,
-      [fullName, email, hash, role.rows[0].id]
-    );
+    const existing = await pool.query("SELECT id FROM users WHERE lower(email)=lower($1)", [email]);
+    if (existing.rowCount) {
+      await pool.query(
+        "UPDATE users SET full_name=$1, email=$2, password_hash=$3, role_id=$4, is_active=TRUE WHERE id=$5",
+        [fullName, email, hash, role.rows[0].id, existing.rows[0].id]
+      );
+    } else {
+      await pool.query(
+        "INSERT INTO users(full_name, email, password_hash, role_id, is_active) VALUES($1, $2, $3, $4, TRUE)",
+        [fullName, email, hash, role.rows[0].id]
+      );
+    }
     console.log(`Shared admin account is ready for ${email}. Never share ADMIN_PASSWORD in chat or commit it to Git.`);
   } catch (err) {
     const safeMessages = [

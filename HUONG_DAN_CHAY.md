@@ -245,7 +245,7 @@ Các bài kiểm thử tích hợp cần PostgreSQL đang chạy và file cấu 
 Nếu cần cập nhật cấu trúc database hiện có, chỉ chạy lệnh sau trong thư mục `backend/` sau khi xác nhận đúng database đích:
 
 ```powershell
-npm run ddevb:migrate
+npm run db:migrate
 ```
 
 Trước khi chạy migration, cần kiểm tra và xử lý các email trùng nhau nếu khác biệt chữ hoa/chữ thường.

@@ -70,6 +70,9 @@ CREATE TABLE IF NOT EXISTS transactions (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS rentals_one_active_tray_uidx
+  ON rentals(tray_id) WHERE status = 'ACTIVE';
+
 CREATE TABLE IF NOT EXISTS iot_devices (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   room_id UUID REFERENCES cultivation_rooms(id) ON DELETE SET NULL,

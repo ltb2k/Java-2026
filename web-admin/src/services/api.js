@@ -13,7 +13,10 @@ export async function api(path, options = {}) {
   } catch {
     throw new Error("Không thể kết nối máy chủ. Kiểm tra backend và cấu hình API.");
   }
-  if (options.raw) return res;
+  if (options.raw) {
+    if (res.status === 401) window.dispatchEvent(new Event("auth:expired"));
+    return res;
+  }
   const data = await res.json().catch(() => ({}));
   if (res.status === 401 && path !== "/auth/login" && path !== "/auth/register") {
     window.dispatchEvent(new Event("auth:expired"));

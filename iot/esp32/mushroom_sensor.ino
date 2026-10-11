@@ -12,6 +12,8 @@ const char* WIFI_PASSWORD = "YOUR_PASSWORD";
 const char* API_URL = "http://192.168.1.100:5000/api/sensors/ingest";
 const char* DEVICE_CODE = "ESP32-ROOM-01";
 const char* TRAY_CODE = "TRAY-A101";
+// Configure privately on the device. Do not commit a real device key.
+const char* DEVICE_API_KEY = "SET_DEVICE_KEY_ON_DEVICE";
 
 void setup(){
   Serial.begin(115200);
@@ -30,6 +32,7 @@ void loop(){
     HTTPClient http;
     http.begin(API_URL);
     http.addHeader("Content-Type","application/json");
+    http.addHeader("x-device-key", DEVICE_API_KEY);
     JsonDocument doc;
     doc["deviceCode"]=DEVICE_CODE;
     doc["trayCode"]=TRAY_CODE;

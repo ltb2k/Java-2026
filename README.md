@@ -35,7 +35,9 @@ The supported development application is the project at this repository root. `j
 
 ## Existing databases
 
-The backend checks schema readiness but does not migrate automatically. Before upgrading an existing database, inspect it and make a backup. Run `npm run db:migrate` from `backend/` only after confirming the target is a local development database and resolving any case-insensitive duplicate emails. This migration is additive and does not delete rows.
+The backend checks schema readiness but does not migrate automatically. Before upgrading an existing database, inspect it and make a backup. Run `npm run db:migrate` from `backend/` only after confirming the target is a local development database and resolving any case-insensitive duplicate emails or duplicate active rentals. This migration is additive and does not delete rows.
+
+`database/migrations/20261011_add_active_rental_constraint.sql` is provided for manual database administration only. It prevents more than one active rental for a tray and is never applied automatically.
 
 Do not run `docker compose down -v` for a database that contains data: removing the volume deletes that database.
 

@@ -20,7 +20,7 @@ VALUES
 ON CONFLICT (name) DO NOTHING;
 
 INSERT INTO cultivation_trays(room_id,code,mushroom_type,rack,status,growth_day,expected_harvest_date)
-SELECT id,'TRAY-A101','Nấm Bào Ngư Xám','Kệ 03','RENTED',14,CURRENT_DATE+16
+SELECT id,'TRAY-A101','Nấm Bào Ngư Xám','Kệ 03','AVAILABLE',14,CURRENT_DATE+16
 FROM cultivation_rooms WHERE code='ROOM-01'
 ON CONFLICT (code) DO NOTHING;
 
@@ -28,18 +28,6 @@ INSERT INTO cultivation_trays(room_id,code,mushroom_type,rack,status,growth_day)
 SELECT id,'TRAY-A102','Nấm Bào Ngư Trắng','Kệ 04','AVAILABLE',0
 FROM cultivation_rooms WHERE code='ROOM-01'
 ON CONFLICT (code) DO NOTHING;
-
-INSERT INTO rentals(customer_id, tray_id, package_id, end_date, status)
-SELECT u.id, t.id, p.id, CURRENT_DATE + 16, 'ACTIVE'
-FROM users u, cultivation_trays t, rental_packages p
-WHERE u.email='customer@mushroom.local' AND t.code='TRAY-A101' AND p.name='Gói 30 ngày'
-AND NOT EXISTS (SELECT 1 FROM rentals r WHERE r.tray_id=t.id AND r.status='ACTIVE');
-
-INSERT INTO transactions(rental_id, customer_id, amount, note)
-SELECT rent.id, rent.customer_id, p.price, 'Seed demo rental'
-FROM rentals rent
-JOIN rental_packages p ON p.id=rent.package_id
-WHERE NOT EXISTS (SELECT 1 FROM transactions tx WHERE tx.rental_id=rent.id);
 
 INSERT INTO iot_devices(room_id,name,device_code,device_type,status,is_on,last_seen)
 SELECT id,'ESP32 Room 01','ESP32-ROOM-01','ESP32','ONLINE',TRUE,NOW()
@@ -87,8 +75,3 @@ INSERT INTO cultivation_progress(tray_id,stage,progress_percent,note)
 SELECT id,'Ra quả thể',70,'Giai đoạn phát triển mũ nấm'
 FROM cultivation_trays WHERE code='TRAY-A101'
 AND NOT EXISTS (SELECT 1 FROM cultivation_progress p JOIN cultivation_trays t ON t.id=p.tray_id WHERE t.code='TRAY-A101');
-
-INSERT INTO notifications(user_id,title,message,type)
-SELECT u.id,'Chào mừng khách hàng','Khay TRAY-A101 đã được liên kết với tài khoản của bạn.','INFO'
-FROM users u WHERE u.email='customer@mushroom.local'
-AND NOT EXISTS (SELECT 1 FROM notifications n WHERE n.user_id=u.id AND n.title='Chào mừng khách hàng');

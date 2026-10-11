@@ -8,7 +8,10 @@ exports.list = async (req, res) => {
     let where = "";
     if (!staff) {
       params.push(req.user.id);
-      where = `WHERE (h.customer_id=$1 OR t.id IN (SELECT tray_id FROM rentals WHERE customer_id=$1))`;
+      where = `WHERE h.customer_id=$1 OR EXISTS (
+        SELECT 1 FROM rentals rent
+        WHERE rent.tray_id=h.tray_id AND rent.customer_id=$1 AND rent.status='ACTIVE'
+      )`;
     }
     const r = await pool.query(`
       SELECT h.*, t.code tray_code, t.mushroom_type, u.full_name customer_name
