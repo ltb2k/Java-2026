@@ -72,6 +72,9 @@ exports.ingest = async (req, res) => {
     const { deviceCode, temperature, humidity, co2, trayCode } = body;
     if (typeof deviceCode !== "string" || !deviceCode.trim() ||
         [temperature, humidity, co2].some((value) => value != null && (typeof value !== "number" || !Number.isFinite(value))) ||
+        (temperature != null && (temperature < -20 || temperature > 80)) ||
+        (humidity != null && (humidity < 0 || humidity > 100)) ||
+        (co2 != null && (co2 < 0 || co2 > 100000)) ||
         (trayCode != null && typeof trayCode !== "string")) {
       return res.status(400).json({ message: "Invalid sensor payload" });
     }

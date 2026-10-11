@@ -7,12 +7,29 @@ void main() => runApp(const MushroomApp());
 
 class MushroomApp extends StatelessWidget {
   const MushroomApp({super.key});
+
   @override
   Widget build(BuildContext context) => MaterialApp(
         debugShowCheckedModeBanner: false,
-        title: 'Mushroom-IoT',
+        title: 'Mushroom-IoT SaaS',
         theme: ThemeData.dark(useMaterial3: true).copyWith(
-          colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal, brightness: Brightness.dark),
+          scaffoldBackgroundColor: const Color(0xFF060B13),
+          appBarTheme: const AppBarTheme(
+            backgroundColor: Color(0xFF0E1A2D),
+            elevation: 0,
+            titleTextStyle: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+          ),
+          navigationBarTheme: NavigationBarThemeData(
+            backgroundColor: const Color(0xFF0E1A2D),
+            indicatorColor: const Color(0x3310B981),
+            iconTheme: WidgetStateProperty.resolveWith((states) {
+              if (states.contains(WidgetState.selected)) {
+                return const IconThemeData(color: Color(0xFF34D399));
+              }
+              return const IconThemeData(color: Colors.white60);
+            }),
+          ),
+          colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF10B981), brightness: Brightness.dark),
         ),
         home: const AuthGate(),
       );

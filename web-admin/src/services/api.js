@@ -33,6 +33,10 @@ export const updateMe = (x) => api("/auth/me", { method: "PATCH", body: JSON.str
 export const dashboard = () => api("/dashboard/summary");
 export const sensorHistory = () => api("/sensors/history");
 export const sensorLatest = () => api("/sensors/latest");
+export const outdoorWeather = () => api("/external/weather/current");
+export const outdoorWeatherHistory = (start, end) => api(`/external/weather/history?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`);
+export const referenceMedia = () => api("/reference/media");
+export const cultivationGuides = () => api("/reference/cultivation-guides");
 
 export const rooms = () => api("/rooms");
 export const createRoom = (x) => api("/rooms", { method: "POST", body: JSON.stringify(x) });
@@ -43,6 +47,7 @@ export const trays = (scope) => api("/trays" + (scope ? `?scope=${scope}` : ""))
 export const createTray = (x) => api("/trays", { method: "POST", body: JSON.stringify(x) });
 export const updateTray = (id, x) => api(`/trays/${id}`, { method: "PATCH", body: JSON.stringify(x) });
 export const deleteTray = (id) => api(`/trays/${id}`, { method: "DELETE" });
+export const registerTray = (code, packageId) => api("/trays/register", { method: "POST", body: JSON.stringify({ code, packageId }) });
 
 export const devices = () => api("/devices");
 export const createDevice = (x) => api("/devices", { method: "POST", body: JSON.stringify(x) });

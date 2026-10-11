@@ -4,6 +4,7 @@ exports.list = async (req, res) => {
   try {
     const r = await pool.query(`
       SELECT d.id,d.room_id,d.name,d.device_code,d.device_type,d.status,d.is_on,d.last_seen,
+        CASE WHEN d.last_seen IS NOT NULL AND d.last_seen >= NOW()-INTERVAL '5 minutes' THEN 'ONLINE' ELSE 'NOT_CONNECTED' END connection_status,
         rm.name room_name, rm.code room_code
       FROM iot_devices d LEFT JOIN cultivation_rooms rm ON rm.id=d.room_id
       ORDER BY d.name`);

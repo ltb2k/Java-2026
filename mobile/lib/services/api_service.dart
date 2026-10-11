@@ -85,6 +85,8 @@ class ApiService {
   Future<void> registerTray(String code, String packageId) async =>
       _send('POST', '/trays/register', body: {'code': code, 'packageId': packageId});
   Future<Map<String, dynamic>> dashboard() async => Map<String, dynamic>.from(await _send('GET', '/dashboard/summary'));
+  Future<Map<String, dynamic>> outdoorWeather() async => Map<String, dynamic>.from(await _send('GET', '/external/weather/current'));
+  Future<List<dynamic>> referenceMedia() async => List<dynamic>.from(await _send('GET', '/reference/media'));
   Future<List<dynamic>> history() async => List<dynamic>.from(await _send('GET', '/sensors/history'));
   Future<List<dynamic>> cameras() async => List<dynamic>.from(await _send('GET', '/cameras'));
   Future<List<dynamic>> notifications() async => List<dynamic>.from(await _send('GET', '/notifications'));

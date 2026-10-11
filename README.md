@@ -44,3 +44,7 @@ Do not run `docker compose down -v` for a database that contains data: removing 
 ## Checks
 
 From `backend/`, run `npm test`. From `web-admin/`, run `npm run build`. Full authentication and database integration checks require a local PostgreSQL instance and a privately configured backend environment.
+
+## Internet data and reference media
+
+The project can show authenticated, cached outdoor weather from Open-Meteo, NASA POWER history, and clearly labelled reference media. These are never presented as measurements from the cultivation room. Read [docs/internet-data.md](docs/internet-data.md) before changing media, weather locations, or external sources.

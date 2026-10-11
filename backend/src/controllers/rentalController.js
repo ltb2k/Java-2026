@@ -59,17 +59,35 @@ exports.create = async (req, res) => {
 };
 
 exports.update = async (req, res) => {
+  let client;
   try {
     const { status, endDate } = req.body;
-    const r = await pool.query(`
+    if (!UUID_RE.test(req.params.id) || (status !== undefined && !["ACTIVE", "COMPLETED", "CANCELLED"].includes(status)) ||
+        (endDate !== undefined && (typeof endDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(endDate)))) {
+      return res.status(400).json({ message: "Thông tin hợp đồng không hợp lệ" });
+    }
+    client = await pool.connect();
+    await client.query("BEGIN");
+    const current = await client.query("SELECT * FROM rentals WHERE id=$1 FOR UPDATE", [req.params.id]);
+    if (!current.rowCount) throw Object.assign(new Error("Rental not found"), { status: 404, publicMessage: "Rental not found" });
+    const nextStatus = status || current.rows[0].status;
+    if (nextStatus === "ACTIVE") {
+      const other = await client.query("SELECT 1 FROM rentals WHERE tray_id=$1 AND status='ACTIVE' AND id<>$2", [current.rows[0].tray_id, req.params.id]);
+      if (other.rowCount) throw Object.assign(new Error("Active rental exists"), { status: 409, publicMessage: "Khay đã có hợp đồng đang hoạt động" });
+    }
+    const r = await client.query(`
       UPDATE rentals SET status=COALESCE($1,status), end_date=COALESCE($2,end_date)
       WHERE id=$3 RETURNING *`, [status || null, endDate || null, req.params.id]);
-    if (!r.rowCount) return res.status(404).json({ message: "Rental not found" });
-    if (status === "COMPLETED" || status === "CANCELLED") {
-      await pool.query("UPDATE cultivation_trays SET status='AVAILABLE' WHERE id=$1", [r.rows[0].tray_id]);
-    }
+    if (nextStatus === "COMPLETED" || nextStatus === "CANCELLED") await client.query("UPDATE cultivation_trays SET status='AVAILABLE' WHERE id=$1", [r.rows[0].tray_id]);
+    if (nextStatus === "ACTIVE") await client.query("UPDATE cultivation_trays SET status='RENTED' WHERE id=$1", [r.rows[0].tray_id]);
+    await client.query("COMMIT");
     res.json(r.rows[0]);
-  } catch (e) { console.error("Controller request failed", { code: e.code || "UNKNOWN" }); return res.status(500).json({ message: "Internal server error" }); }
+  } catch (e) {
+    if (client) await client.query("ROLLBACK").catch(() => {});
+    if (e.status) return res.status(e.status).json({ message: e.publicMessage });
+    if (e.code === "23505") return res.status(409).json({ message: "Khay đã có hợp đồng đang hoạt động" });
+    console.error("Controller request failed", { code: e.code || "UNKNOWN" }); return res.status(500).json({ message: "Internal server error" });
+  } finally { client?.release(); }
 };
 
 exports.transactions = async (req, res) => {

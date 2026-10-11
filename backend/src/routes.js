@@ -18,6 +18,7 @@ const packages = require("./controllers/packageController");
 const rentals = require("./controllers/rentalController");
 const thresholds = require("./controllers/thresholdController");
 const reports = require("./controllers/reportController");
+const external = require("./controllers/externalController");
 
 router.post("/auth/login", authC.login);
 router.post("/auth/register", authC.register);
@@ -30,6 +31,10 @@ router.patch("/users/:id", auth, admin, users.update);
 router.delete("/users/:id", auth, admin, users.remove);
 
 router.get("/dashboard/summary", auth, dash.summary);
+router.get("/external/weather/current", auth, external.currentWeather);
+router.get("/external/weather/history", auth, external.weatherHistory);
+router.get("/reference/media", auth, external.referenceMedia);
+router.get("/reference/cultivation-guides", auth, external.cultivationGuides);
 
 router.get("/rooms", auth, rooms.list);
 router.post("/rooms", auth, staff, rooms.create);
