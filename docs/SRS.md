@@ -53,9 +53,12 @@ Các API bảo vệ phải kiểm tra vai trò **và quyền trên tài nguyên 
 ### 3. Sơ đồ tác nhân và Use Case tổng quan
 
 **Quan hệ tác nhân.**
-![Sơ đồ tác nhân](diagrams/so_do_tac_nhan.png)
 
-```plantuml
+![Sơ đồ tác nhân](diagrams/so_do_tac_nhan.png)
+<details>
+<summary>Code PlantUML</summary>
+
+```
 @startuml
 left to right direction
 skinparam actorStyle stickman
@@ -69,12 +72,15 @@ Operator -- System : vận hành trang trại
 Admin -- System : quản trị hệ thống
 @enduml
 ```
+</details>
 
 **Use Case tổng quan.**
 
 ![Use Case tổng quan](<diagrams/uc_tong _quan.png>)
+<details>
+<summary>Code PlantUML</summary>
 
-```plantuml
+```
 @startuml
 left to right direction
 skinparam usecase {
@@ -111,13 +117,20 @@ Operator -- Control
 Operator -- Harvest
 Admin -- ManageAdmin
 Admin --|> Operator
+
 @enduml
 ```
+</details>
+
 
 **Use Case chi tiết — thuê và liên kết khay:**
+
 ![Use Case thuê và liên kết khay](diagrams/uc_thue_khay.png)
 
-```plantuml
+<details>
+<summary>Code PlantUML</summary>
+
+```
 @startuml
 left to right direction
 actor "Khách hàng" as Customer
@@ -150,15 +163,23 @@ Assign ..> CheckTray : <<include>>
 Assign ..> IssueCode : <<include>>
 Link ..> CheckCode : <<include>>
 View ..> CheckLease : <<include>>
+
 @enduml
+
 ```
+</details>
+
 
 ### 4. Biểu đồ Use Case theo từng tác nhân
 
 **4.1. Khách hàng**
+
 ![Use Case khách hàng](diagrams/uc_khach_hang.png)
 
-```plantuml
+<details>
+<summary>Code PlantUML</summary>
+
+```
 @startuml
 left to right direction
 skinparam usecase BackgroundColor #FFFACD
@@ -202,13 +223,20 @@ note bottom of Environment
   Chỉ phòng chứa khay có lease ACTIVE
   và liên kết hợp lệ của khách hàng.
 end note
+
 @enduml
 ```
+</details>
 
 **4.2. Nhân viên vận hành**
+
 ![Use Case nhân viên vận hành](diagrams/uc_nhan_vien.png)
 
-```plantuml
+
+<details>
+<summary>Code PlantUML</summary>
+
+```
 @startuml
 left to right direction
 skinparam usecase BackgroundColor #FFFACD
@@ -241,12 +269,18 @@ note bottom of Assign
   Chỉ gán sau khi yêu cầu được duyệt.
 end note
 @enduml
+
 ```
+</details>
 
 **4.3. Quản trị viên**
+
 ![Use Case quản trị viên](diagrams/uc_quan_tri_vien.png)
 
-```plantuml
+<details>
+<summary>Code PlantUML</summary>
+
+```
 @startuml
 left to right direction
 skinparam usecase BackgroundColor #FFFACD
@@ -267,13 +301,21 @@ note bottom of Users
   Tài khoản Admin đầu tiên được tạo
   qua quy trình được ủy quyền.
 end note
+
 @enduml
+
 ```
+</details>
+
 
 ### 5. Biểu đồ hoạt động của các chức năng chính
 
 **5.1. Đăng ký, xác minh email và đăng nhập**
+
 ![alt text](diagrams/activity_dang_ky.png)
+
+<details>
+<summary>Code PlantUML</summary>
 
 ```
 @startuml
@@ -330,10 +372,16 @@ endif
 stop
 
 @enduml
+
 ```
+</details>
 
 **5.2. Quản lý phòng, khay, gói thuê và thiết bị**
+
 ![alt text](diagrams/activity_quan_ly_phong_khay_goi_thue.png)
+
+<details>
+<summary>Code PlantUML</summary>
 
 ```
 @startuml
@@ -384,10 +432,16 @@ else (Không)
 endif
 
 @enduml
+
 ```
+</details>
 
 **5.3. Thuê và liên kết khay**
+
 ![alt text](diagrams/activity_thue_lien_ket_khay.png)
+
+<details>
+<summary>Code PlantUML</summary>
 
 ```
 @startuml
@@ -450,10 +504,16 @@ endif
 
 stop
 @enduml
+
 ```
+</details>
 
 **5.4. Giám sát môi trường và cảnh báo**
+
 ![alt text](diagrams/activity_giam_sat_canh_bao.png)
+
+<details>
+<summary>Code PlantUML</summary>
 
 ```
 @startuml
@@ -510,11 +570,16 @@ else (Không)
 endif
 
 @enduml
+
 ```
+</details>
 
 **5.5. Điều khiển thiết bị thủ công**
 
 ![alt text](diagrams/activity_dieu_khien_thiet_bi.png)
+
+<details>
+<summary>Code PlantUML</summary>
 
 ```
 @startuml
@@ -561,10 +626,15 @@ else (Không)
 endif
 
 @enduml
+
 ```
+</details>
 
 **5.6. Cập nhật tiến độ và ghi nhận thu hoạch**
+
 ![alt text](diagrams/activity_cap_nhat_tien_do.png)
+<details>
+<summary>Code PlantUML</summary>
 
 ```
 @startuml
@@ -614,13 +684,18 @@ else (Không)
 endif
 
 @enduml
+
 ```
+</details>
 
 ### 6. Sơ đồ tuần tự
 
 **6.1. Đăng ký, xác minh email và đăng nhập**
 
 ![Sơ đồ tuần tự đăng ký, đăng nhập](diagrams/sequence_dang_ky.png)
+
+<details>
+<summary>Code PlantUML</summary>
 
 ```
 @startuml
@@ -654,10 +729,16 @@ else Thông tin không hợp lệ hoặc email đã tồn tại
 end
 
 @enduml
+
 ```
+</details>
 
 **6.2. Quản lý phòng, khay, gói thuê và thiết bị**
+
 ![Sơ đồ tuần tự quản lý danh mục](diagrams/sequence_quan_ly_danh_muc.png)
+
+<details>
+<summary>Code PlantUML</summary>
 
 ```
 @startuml
@@ -696,10 +777,17 @@ opt Xóa tài nguyên có lịch sử hoặc quan hệ sử dụng
 end
 
 @enduml
+
 ```
 
+</details>
+
 **6.3. Thuê và liên kết khay**
+
 ![alt text](diagrams/sequence_thue_lienket_khay.png)
+
+<details>
+<summary>Code PlantUML</summary>
 
 ```
 @startuml
@@ -748,10 +836,16 @@ else Tài khoản, gói hoặc số lượng không hợp lệ
 end
 
 @enduml
+
 ```
+</details>
 
 **6.4. Giám sát môi trường và cảnh báo**
+
 ![alt text](diagrams/sequence_canh_bao_moitruong.png)
+
+<details>
+<summary>Code PlantUML</summary>
 
 ```
 @startuml
@@ -786,10 +880,16 @@ else Payload không hợp lệ hoặc trùng
 end
 
 @enduml
+
 ```
+</details>
 
 **6.5. Điều khiển thiết bị thủ công**
+
 ![alt text](diagrams/sequence_dieu_khien_thiet_bi.png)
+
+<details>
+<summary>Code PlantUML</summary>
 
 ```
 @startuml
@@ -829,10 +929,16 @@ else Không hợp lệ hoặc không đủ quyền
 end
 
 @enduml
+
 ```
+</details>
 
 **6.6. Cập nhật tiến độ và ghi nhận thu hoạch**
+
 ![alt text](diagrams/sequence_capnhat_tiendo_ghinhan_thuhoach.png)
+
+<details>
+<summary>Code PlantUML</summary>
 
 ```
 @startuml
@@ -870,7 +976,9 @@ else Chuyển giai đoạn sai hoặc dữ liệu thu hoạch thiếu
 end
 
 @enduml
+
 ```
+</details>
 
 ### 7. Luồng dữ liệu
 
@@ -884,9 +992,13 @@ end
 ### 8. Trạng thái thực thể
 
 **Yêu cầu/lease thuê khay:**
+
 ![alt text](diagrams/bieu_do_trang_thai.png)
 
-```plantuml
+<details>
+<summary>Code PlantUML</summary>
+
+```
 @startuml
 [*] --> PENDING
 PENDING --> APPROVED : duyệt
@@ -899,7 +1011,9 @@ ASSIGNED --> CANCELLED : Operator/Admin hủy có lý do
 ACTIVE --> COMPLETED : kết thúc thuê
 ACTIVE --> CANCELLED : hủy theo quy trình
 @enduml
+
 ```
+</details>
 
 **Giai đoạn nuôi trồng:** `PREPARATION → INCUBATION → FRUITING → READY_TO_HARVEST → HARVESTED → COMPLETED`. Mọi lần chuyển lưu actor, thời điểm, ghi chú; không bỏ qua bước khi chưa có quy tắc cho phép.
 
@@ -921,7 +1035,10 @@ ACTIVE --> CANCELLED : hủy theo quy trình
 
 ![Sơ đồ kiến trúc hệ thống](diagrams/architecture.png)
 
-```plantuml
+<details>
+<summary>Code PlantUML</summary>
+
+```
 @startuml
 left to right direction
 component "React Web\nAdmin/Operator" as Web
@@ -942,13 +1059,18 @@ Camera --> Gateway : RTSP
 Gateway --> Web : HLS URL theo quyền
 Gateway --> Mobile : HLS URL theo quyền
 @enduml
+
 ```
+</details>
 
 Backend là nơi xác thực, phân quyền, kiểm tra nghiệp vụ và lưu trạng thái. Web/Mobile không tự quyết định quyền hoặc trạng thái lease. Media gateway chỉ cần khi triển khai camera. Nếu phát triển điều khiển tự động, chức năng này mặc định tắt và chỉ được bật khi ngưỡng hợp lệ, dữ liệu mới, trạng thái an toàn đã được kiểm thử và không có lệnh thủ công đang được ưu tiên.
 
 ### 2. Mô hình cơ sở dữ liệu khái niệm
 
 ![Mô hình cơ sở dữ liệu khái niệm](diagrams/conceptual_database.png)
+
+<details>
+<summary>Code PlantUML</summary>
 
 ```plantuml
 @startuml
@@ -1083,7 +1205,9 @@ TRAY ||--o{ GROWTH_LOG : tracks
 TRAY ||--o{ HARVEST : produces
 USER ||--o{ ENV_THRESHOLD : updates
 @enduml
+
 ```
+</details>
 
 Đây là mô hình **khái niệm**, không phải migration PostgreSQL cuối cùng. Các ràng buộc vật lý bắt buộc: email/mã khay/ID thiết bị duy nhất; không có hai lease ACTIVE cho cùng khay; mã liên kết một lần và hạn 24 giờ; `messageId` và `commandId` chống xử lý lặp; telemetry gắn **Device → Room**, Customer xem qua **Room → Tray → Lease**. `ENV_THRESHOLD` lưu actor và thời điểm cập nhật, ngưỡng/đơn vị hợp lệ; không lưu ngưỡng mặc định giả định.
 
@@ -1095,3 +1219,4 @@ USER ||--o{ ENV_THRESHOLD : updates
 | Mobile Customer    | Đăng ký/xác minh/login, gói thuê, yêu cầu thuê, nhập mã liên kết, khay của tôi, chi tiết khay/môi trường/tiến độ/lịch thu hoạch                           | Chỉ dữ liệu của khay ACTIVE; đơn vị °C/%RH/ppm và thời điểm đo rõ; danh sách trống, mạng lỗi, mã sai/hết hạn có thông báo tiếng Việt.               |
 
 **Điều hướng tối thiểu:** Web `Đăng nhập → Dashboard → Danh mục/Thuê/IoT/Thu hoạch`; Mobile `Đăng ký hoặc Đăng nhập → Gói thuê → Yêu cầu thuê → Liên kết → Khay của tôi → Chi tiết khay`. Giao diện bảo vệ route nhưng backend vẫn phải kiểm tra quyền ở mọi API.
+
