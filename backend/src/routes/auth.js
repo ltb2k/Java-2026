@@ -1,51 +1,69 @@
 import { Router } from "express";
-import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
-import { query } from "../db.js";
+import * as authService from "../services/authService.js";
+import { authRequired, optionalAuth } from "../middleware/auth.js";
+import { validateRequired, validateEmail, validatePassword } from "../middleware/validation.js";
+import { AppError } from "../middleware/errorHandler.js";
 
 const router = Router();
 
-router.post("/login", async (req, res) => {
+/** POST /api/auth/register */
+router.post("/register", async (req, res, next) => {
+  try {
+    const { full_name, email, password } = req.body || {};
+    validateRequired(req.body, ["full_name", "email", "password"]);
+    validateEmail(email);
+    validatePassword(password, 6);
+    const user = await authService.register({ full_name, email, password });
+    res.status(201).json({ message: "Đăng ký tài khoản thành công", user });
+  } catch (err) { next(err); }
+});
+
+/** POST /api/auth/login */
+router.post("/login", async (req, res, next) => {
   try {
     const { email, password } = req.body || {};
-    if (!email || !password) {
-      return res.status(400).json({ message: "Email and password are required" });
-    }
+    validateRequired(req.body, ["email", "password"]);
+    const result = await authService.login({ email, password });
+    res.json(result);
+  } catch (err) { next(err); }
+});
 
-    const result = await query(
-      "SELECT id, full_name, email, password_hash, role, is_active FROM users WHERE email=$1",
-      [email.toLowerCase().trim()]
-    );
-    const user = result.rows[0];
+/** POST /api/auth/verify-email */
+router.post("/verify-email", async (req, res, next) => {
+  try {
+    const { token } = req.body || {};
+    if (!token) throw new AppError("Mã xác minh là bắt buộc", 400);
+    const user = await authService.verifyEmail(token);
+    res.json({ message: "Xác minh email thành công", user });
+  } catch (err) { next(err); }
+});
 
-    if (!user || !user.is_active) {
-      return res.status(401).json({ message: "Invalid credentials" });
-    }
+/** GET /api/auth/me */
+router.get("/me", authRequired, async (req, res, next) => {
+  try {
+    const user = await authService.getProfile(req.user.id);
+    res.json(user);
+  } catch (err) { next(err); }
+});
 
-    const ok = await bcrypt.compare(password, user.password_hash);
-    if (!ok) {
-      return res.status(401).json({ message: "Invalid credentials" });
-    }
+/** PUT /api/auth/me */
+router.put("/me", authRequired, async (req, res, next) => {
+  try {
+    validateRequired(req.body, ["full_name"]);
+    const user = await authService.updateProfile(req.user.id, req.body);
+    res.json(user);
+  } catch (err) { next(err); }
+});
 
-    const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role, name: user.full_name },
-      process.env.JWT_SECRET,
-      { expiresIn: "8h" }
-    );
-
-    res.json({
-      token,
-      user: {
-        id: user.id,
-        name: user.full_name,
-        email: user.email,
-        role: user.role
-      }
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Login failed" });
-  }
+/** PUT /api/auth/change-password */
+router.put("/change-password", authRequired, async (req, res, next) => {
+  try {
+    const { currentPassword, newPassword } = req.body || {};
+    validateRequired(req.body, ["currentPassword", "newPassword"]);
+    validatePassword(newPassword, 6);
+    const result = await authService.changePassword(req.user.id, { currentPassword, newPassword });
+    res.json(result);
+  } catch (err) { next(err); }
 });
 
 export default router;

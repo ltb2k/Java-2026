@@ -1,42 +1,63 @@
 import { Router } from "express";
 import { query } from "../db.js";
 import { authRequired } from "../middleware/auth.js";
+import { getLatestReadings } from "../services/sensorService.js";
 
 const router = Router();
 
-router.get("/summary", authRequired, async (_req, res) => {
+/** GET /api/dashboard/summary  — Overview stats for dashboard */
+router.get("/summary", authRequired, async (req, res, next) => {
   try {
-    const latest = await query(`
-      SELECT DISTINCT ON (sensor_type)
-        sensor_type, value, recorded_at
-      FROM sensor_readings
-      ORDER BY sensor_type, recorded_at DESC
+    const [
+      roomsRes,
+      traysRes,
+      devicesRes,
+      activeRentalsRes,
+      pendingRentalsRes,
+      unreadAlertsRes,
+      latestReadings,
+    ] = await Promise.all([
+      query("SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE status='ACTIVE') AS active FROM rooms WHERE is_archived=FALSE"),
+      query("SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE status='RENTED') AS rented, COUNT(*) FILTER (WHERE status='AVAILABLE') AS available FROM trays WHERE is_archived=FALSE"),
+      query("SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE is_on=TRUE) AS on_count FROM devices"),
+      query("SELECT COUNT(*) AS count FROM rentals WHERE status='ACTIVE'"),
+      query("SELECT COUNT(*) AS count FROM rentals WHERE status='PENDING'"),
+      query("SELECT COUNT(*) AS count FROM alerts WHERE status='ACTIVE' AND is_read=FALSE"),
+      getLatestReadings(),
+    ]);
+
+    // Recent activity
+    const recentActivity = await query(`
+      SELECT 'rental' AS type, r.id, u.full_name AS actor, r.status, r.updated_at AS ts
+      FROM rentals r JOIN users u ON u.id=r.customer_id
+      WHERE r.updated_at > NOW() - INTERVAL '24 hours'
+      ORDER BY r.updated_at DESC LIMIT 5
     `);
 
-    const trays = await query(`
-      SELECT t.code, t.status, r.name AS room_name, rp.name AS package_name,
-             u.full_name AS customer_name, t.growth_day, t.growth_total_days
-      FROM trays t
-      LEFT JOIN rooms r ON r.id=t.room_id
-      LEFT JOIN rental_packages rp ON rp.id=t.package_id
-      LEFT JOIN rentals rent ON rent.tray_id=t.id AND rent.status='ACTIVE'
-      LEFT JOIN users u ON u.id=rent.customer_id
-      ORDER BY t.id
-      LIMIT 1
-    `);
-
-    const current = { temperature: 0, humidity: 0, co2: 0 };
-    for (const row of latest.rows) {
-      if (row.sensor_type === "TEMPERATURE") current.temperature = Number(row.value);
-      if (row.sensor_type === "HUMIDITY") current.humidity = Number(row.value);
-      if (row.sensor_type === "CO2") current.co2 = Number(row.value);
-    }
-
-    res.json({ current, tray: trays.rows[0] || null, backend: "connected" });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Cannot load dashboard" });
-  }
+    res.json({
+      rooms: {
+        total: parseInt(roomsRes.rows[0].total, 10),
+        active: parseInt(roomsRes.rows[0].active, 10),
+      },
+      trays: {
+        total: parseInt(traysRes.rows[0].total, 10),
+        rented: parseInt(traysRes.rows[0].rented, 10),
+        available: parseInt(traysRes.rows[0].available, 10),
+      },
+      devices: {
+        total: parseInt(devicesRes.rows[0].total, 10),
+        on: parseInt(devicesRes.rows[0].on_count, 10),
+      },
+      rentals: {
+        active: parseInt(activeRentalsRes.rows[0].count, 10),
+        pending: parseInt(pendingRentalsRes.rows[0].count, 10),
+      },
+      unread_alerts: parseInt(unreadAlertsRes.rows[0].count, 10),
+      environment: latestReadings,
+      recent_activity: recentActivity.rows,
+      backend: "connected",
+    });
+  } catch (err) { next(err); }
 });
 
 export default router;

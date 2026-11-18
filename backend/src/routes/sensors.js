@@ -1,41 +1,42 @@
 import { Router } from "express";
-import { query } from "../db.js";
-import { authRequired } from "../middleware/auth.js";
+import * as sensorService from "../services/sensorService.js";
+import { authRequired, requireRoles } from "../middleware/auth.js";
+import { validateRequired } from "../middleware/validation.js";
 
 const router = Router();
 
-router.get("/history", authRequired, async (_req, res) => {
+/** GET /api/sensors/latest  — latest readings per sensor type */
+router.get("/latest", authRequired, async (req, res, next) => {
   try {
-    const result = await query(`
-      SELECT sensor_type, value, recorded_at
-      FROM sensor_readings
-      ORDER BY recorded_at DESC
-      LIMIT 200
-    `);
-    res.json(result.rows);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Cannot load sensor history" });
-  }
+    const { room_id } = req.query;
+    const readings = await sensorService.getLatestReadings(room_id ? +room_id : null);
+    res.json(readings);
+  } catch (err) { next(err); }
 });
 
-router.post("/", authRequired, async (req, res) => {
+/** GET /api/sensors/history  — paginated history with filters */
+router.get("/history", authRequired, async (req, res, next) => {
   try {
-    const { tray_id, sensor_type, value } = req.body;
-    if (!sensor_type || value === undefined) {
-      return res.status(400).json({ message: "sensor_type and value are required" });
-    }
-
-    const result = await query(
-      `INSERT INTO sensor_readings (tray_id, sensor_type, value)
-       VALUES ($1,$2,$3) RETURNING *`,
-      [tray_id || null, sensor_type, Number(value)]
+    const { room_id, tray_id, sensor_type, from, to, limit } = req.query;
+    const history = await sensorService.getSensorHistory(
+      { room_id: room_id ? +room_id : null, tray_id: tray_id ? +tray_id : null, sensor_type, from, to, limit },
+      req.user.role === "CUSTOMER" ? req.user.id : null,
+      req.user.role
     );
-    res.status(201).json(result.rows[0]);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Cannot save sensor reading" });
-  }
+    res.json(history);
+  } catch (err) { next(err); }
+});
+
+/** POST /api/sensors  — IoT ingest (Admin/Operator; ESP32 devices use this via API key or JWT) */
+router.post("/", authRequired, requireRoles("ADMIN", "OPERATOR"), async (req, res, next) => {
+  try {
+    validateRequired(req.body, ["sensor_type", "value"]);
+    const result = await sensorService.ingestReading(req.body);
+    if (result.duplicate) {
+      return res.status(200).json(result);
+    }
+    res.status(201).json(result);
+  } catch (err) { next(err); }
 });
 
 export default router;
