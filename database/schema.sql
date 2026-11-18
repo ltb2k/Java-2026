@@ -1,19 +1,32 @@
+-- ============================================================
+-- Hệ thống quản lý nuôi trồng nấm thông minh (Mushroom IoT)
+-- Complete PostgreSQL Schema
+-- ============================================================
+
 CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
   full_name VARCHAR(120) NOT NULL,
   email VARCHAR(180) UNIQUE NOT NULL,
   password_hash TEXT NOT NULL,
   role VARCHAR(20) NOT NULL CHECK (role IN ('ADMIN','OPERATOR','CUSTOMER')),
+  status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE','EMAIL_UNVERIFIED','DISABLED','LOCKED')),
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  email_verified BOOLEAN NOT NULL DEFAULT FALSE,
+  verification_token TEXT,
+  failed_login_attempts INT NOT NULL DEFAULT 0,
+  locked_until TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS rooms (
   id SERIAL PRIMARY KEY,
   name VARCHAR(120) NOT NULL,
   location VARCHAR(200),
-  status VARCHAR(30) NOT NULL DEFAULT 'ACTIVE',
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  status VARCHAR(30) NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE','MAINTENANCE','INACTIVE')),
+  is_archived BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS rental_packages (
@@ -21,7 +34,9 @@ CREATE TABLE IF NOT EXISTS rental_packages (
   name VARCHAR(120) NOT NULL,
   duration_days INT NOT NULL,
   price NUMERIC(12,2) NOT NULL DEFAULT 0,
-  description TEXT
+  description TEXT,
+  status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE','INACTIVE')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS trays (
@@ -29,49 +44,131 @@ CREATE TABLE IF NOT EXISTS trays (
   code VARCHAR(50) UNIQUE NOT NULL,
   room_id INT REFERENCES rooms(id) ON DELETE SET NULL,
   package_id INT REFERENCES rental_packages(id) ON DELETE SET NULL,
-  status VARCHAR(30) NOT NULL DEFAULT 'AVAILABLE',
+  status VARCHAR(30) NOT NULL DEFAULT 'AVAILABLE' CHECK (status IN ('AVAILABLE','ASSIGNED','RENTED','MAINTENANCE')),
+  growth_stage VARCHAR(30) NOT NULL DEFAULT 'PREPARATION' CHECK (growth_stage IN ('PREPARATION','INCUBATION','FRUITING','READY_TO_HARVEST','HARVESTED','COMPLETED')),
   growth_day INT NOT NULL DEFAULT 1,
   growth_total_days INT NOT NULL DEFAULT 30,
   mushroom_variety VARCHAR(120) NOT NULL DEFAULT 'Nấm Bào Ngư Xám',
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  is_archived BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS rentals (
   id SERIAL PRIMARY KEY,
   customer_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  tray_id INT REFERENCES trays(id) ON DELETE SET NULL,
+  package_id INT REFERENCES rental_packages(id) ON DELETE SET NULL,
+  quantity INT NOT NULL DEFAULT 1 CHECK (quantity BETWEEN 1 AND 5),
+  status VARCHAR(30) NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING','APPROVED','REJECTED','ASSIGNED','ACTIVE','COMPLETED','CANCELLED')),
+  start_date DATE DEFAULT CURRENT_DATE,
+  end_date DATE,
+  notes TEXT,
+  rejection_reason TEXT,
+  approved_by INT REFERENCES users(id),
+  approved_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS rental_trays (
+  rental_id INT NOT NULL REFERENCES rentals(id) ON DELETE CASCADE,
   tray_id INT NOT NULL REFERENCES trays(id) ON DELETE CASCADE,
-  status VARCHAR(30) NOT NULL DEFAULT 'ACTIVE',
-  start_date DATE NOT NULL DEFAULT CURRENT_DATE,
-  end_date DATE
+  PRIMARY KEY (rental_id, tray_id)
+);
+
+CREATE TABLE IF NOT EXISTS link_codes (
+  id SERIAL PRIMARY KEY,
+  rental_id INT NOT NULL REFERENCES rentals(id) ON DELETE CASCADE,
+  code VARCHAR(32) NOT NULL UNIQUE,
+  expires_at TIMESTAMPTZ NOT NULL,
+  used_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS devices (
   id SERIAL PRIMARY KEY,
   name VARCHAR(120) NOT NULL,
   device_type VARCHAR(50) NOT NULL,
+  room_id INT REFERENCES rooms(id) ON DELETE SET NULL,
   tray_id INT REFERENCES trays(id) ON DELETE SET NULL,
   is_on BOOLEAN NOT NULL DEFAULT FALSE,
+  status VARCHAR(30) NOT NULL DEFAULT 'ONLINE' CHECK (status IN ('ONLINE','OFFLINE','ERROR')),
+  last_seen_at TIMESTAMPTZ,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS env_thresholds (
+  id SERIAL PRIMARY KEY,
+  metric VARCHAR(30) UNIQUE NOT NULL CHECK (metric IN ('TEMPERATURE','HUMIDITY','CO2')),
+  lower_bound NUMERIC(10,2) NOT NULL,
+  upper_bound NUMERIC(10,2) NOT NULL,
+  unit VARCHAR(20) NOT NULL,
+  updated_by INT REFERENCES users(id),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS consecutive_violations (
+  id SERIAL PRIMARY KEY,
+  room_id INT NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
+  metric VARCHAR(30) NOT NULL CHECK (metric IN ('TEMPERATURE','HUMIDITY','CO2')),
+  count INT NOT NULL DEFAULT 0,
+  last_value NUMERIC(10,2),
+  last_recorded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (room_id, metric)
 );
 
 CREATE TABLE IF NOT EXISTS sensor_readings (
   id BIGSERIAL PRIMARY KEY,
+  room_id INT REFERENCES rooms(id) ON DELETE SET NULL,
   tray_id INT REFERENCES trays(id) ON DELETE CASCADE,
+  device_id INT REFERENCES devices(id) ON DELETE SET NULL,
   sensor_type VARCHAR(30) NOT NULL CHECK (sensor_type IN ('TEMPERATURE','HUMIDITY','CO2')),
   value NUMERIC(10,2) NOT NULL,
+  unit VARCHAR(20),
+  message_id VARCHAR(64),
   recorded_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_sensor_time
 ON sensor_readings(sensor_type, recorded_at DESC);
 
+CREATE INDEX IF NOT EXISTS idx_sensor_room_time
+ON sensor_readings(room_id, sensor_type, recorded_at DESC);
+
 CREATE TABLE IF NOT EXISTS alerts (
   id BIGSERIAL PRIMARY KEY,
+  room_id INT REFERENCES rooms(id) ON DELETE CASCADE,
   tray_id INT REFERENCES trays(id) ON DELETE CASCADE,
-  severity VARCHAR(20) NOT NULL DEFAULT 'INFO',
+  metric VARCHAR(30),
+  severity VARCHAR(20) NOT NULL DEFAULT 'WARNING' CHECK (severity IN ('INFO','WARNING','DANGER')),
   title VARCHAR(200) NOT NULL,
   message TEXT NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE','RESOLVED')),
   is_read BOOLEAN NOT NULL DEFAULT FALSE,
+  resolved_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS device_commands (
+  id SERIAL PRIMARY KEY,
+  command_id VARCHAR(64) UNIQUE NOT NULL,
+  device_id INT NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+  action VARCHAR(50) NOT NULL,
+  payload JSONB,
+  status VARCHAR(30) NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING','ACKED','FAILED','TIMEOUT')),
+  issued_by INT REFERENCES users(id),
+  result TEXT,
+  acked_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS growth_logs (
+  id SERIAL PRIMARY KEY,
+  tray_id INT NOT NULL REFERENCES trays(id) ON DELETE CASCADE,
+  stage VARCHAR(30) NOT NULL CHECK (stage IN ('PREPARATION','INCUBATION','FRUITING','READY_TO_HARVEST','HARVESTED','COMPLETED')),
+  notes TEXT,
+  created_by INT REFERENCES users(id),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -79,7 +176,11 @@ CREATE TABLE IF NOT EXISTS harvests (
   id SERIAL PRIMARY KEY,
   tray_id INT REFERENCES trays(id) ON DELETE SET NULL,
   quantity_kg NUMERIC(10,2),
+  quality_grade VARCHAR(20) DEFAULT 'STANDARD',
+  planned_date DATE,
   harvest_date DATE,
-  status VARCHAR(30) NOT NULL DEFAULT 'PLANNED',
-  notes TEXT
+  status VARCHAR(30) NOT NULL DEFAULT 'PLANNED' CHECK (status IN ('PLANNED','COMPLETED','CANCELLED')),
+  notes TEXT,
+  recorded_by INT REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
