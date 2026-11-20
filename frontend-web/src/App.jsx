@@ -3,6 +3,7 @@ import RoomsAndTrays from './pages/rooms-trays/RoomsAndTrays';
 import AdminLayout from './layouts/AdminLayout';
 import Dashboard from './pages/dashboard/Dashboard';
 import RentalRequests from './pages/rental-requests/RentalRequests';
+import Devices from './pages/devices/Devices';
 
 const INITIAL_ROOMS_DATA = [
   {
@@ -78,6 +79,53 @@ const INITIAL_ROOMS_DATA = [
   },
 ];
 
+const INITIAL_DEVICES_DATA = [
+  {
+    id: 'DEV-01',
+    name: 'Cảm biến Nhiệt độ & Độ ẩm DHT22',
+    type: 'sensor',
+    roomId: 1,
+    mac: 'AA:BB:CC:11:22:01',
+    status: 'online',
+    isOn: true,
+    reading: '26.5°C | 84%',
+    lastUpdate: 'Vừa xong',
+  },
+  {
+    id: 'DEV-02',
+    name: 'Hệ thống Phun sương tự động',
+    type: 'actuator',
+    roomId: 1,
+    mac: 'AA:BB:CC:11:22:02',
+    status: 'online',
+    isOn: true,
+    reading: 'Đang phun (70%)',
+    lastUpdate: '1 phút trước',
+  },
+  {
+    id: 'DEV-03',
+    name: 'Quạt thông gió đối lưu',
+    type: 'actuator',
+    roomId: 2,
+    mac: 'AA:BB:CC:11:22:03',
+    status: 'online',
+    isOn: false,
+    reading: 'Đang tắt',
+    lastUpdate: '3 phút trước',
+  },
+  {
+    id: 'DEV-04',
+    name: 'Cảm biến nồng độ CO2',
+    type: 'sensor',
+    roomId: 2,
+    mac: 'AA:BB:CC:11:22:04',
+    status: 'offline',
+    isOn: false,
+    reading: '-- ppm',
+    lastUpdate: '2 giờ trước',
+  },
+];
+
 const PAGE_TITLES = {
   dashboard: 'Giám sát IoT',
   'rooms-trays': 'Phòng & Khay',
@@ -105,6 +153,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [role, setRole] = useState('Operator');
   const [rooms, setRooms] = useState(INITIAL_ROOMS_DATA);
+  const [devices, setDevices] = useState(INITIAL_DEVICES_DATA);
 
   const handleToggleRole = () => {
     setRole((prevRole) =>
@@ -125,6 +174,16 @@ export default function App() {
 
     if (activeTab === 'rentals') {
       return <RentalRequests rooms={rooms} setRooms={setRooms} />;
+    }
+
+    if (activeTab === 'devices') {
+      return (
+        <Devices
+          rooms={rooms}
+          devices={devices}
+          setDevices={setDevices}
+        />
+      );
     }
 
     return (
