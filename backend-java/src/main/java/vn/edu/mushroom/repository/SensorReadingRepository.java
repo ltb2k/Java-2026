@@ -34,11 +34,14 @@ public interface SensorReadingRepository extends JpaRepository<SensorReading, Lo
         Pageable pageable
     );
 
-    @Query("SELECT sr FROM SensorReading sr WHERE sr.sensorType = :sensorType " +
-           "AND (:roomId IS NULL OR sr.room.id = :roomId) " +
-           "ORDER BY sr.recordedAt DESC LIMIT 1")
-    Optional<SensorReading> findLatestBySensorTypeAndRoomId(
-        @Param("sensorType") SensorType sensorType,
-        @Param("roomId") Integer roomId
-    );
+    Optional<SensorReading> findFirstBySensorTypeAndRoomIdOrderByRecordedAtDesc(SensorType sensorType, Integer roomId);
+    Optional<SensorReading> findFirstBySensorTypeOrderByRecordedAtDesc(SensorType sensorType);
+
+    default Optional<SensorReading> findLatestBySensorTypeAndRoomId(SensorType sensorType, Integer roomId) {
+        if (roomId != null) {
+            return findFirstBySensorTypeAndRoomIdOrderByRecordedAtDesc(sensorType, roomId);
+        } else {
+            return findFirstBySensorTypeOrderByRecordedAtDesc(sensorType);
+        }
+    }
 }

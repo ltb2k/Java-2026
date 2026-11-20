@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: mushroom-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: mushroom_iot
+      POSTGRES_USER: mushroom
+      POSTGRES_PASSWORD: mushroom123
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ../database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ../database/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mushroom -d mushroom_iot"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  mosquitto:
+    image: eclipse-mosquitto:2.0
+    container_name: mushroom-mosquitto
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    command: ["mosquitto", "-c", "/mosquitto-no-auth.conf"]
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        echo -e "listener 1883\nallow_anonymous true\nlistener 9001\nprotocol websockets" > /mosquitto-no-auth.conf
+        /usr/sbin/mosquitto -c /mosquitto-no-auth.conf
+
+  backend-java:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mushroom-backend-java
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      PORT: 5000
+      DATABASE_URL: jdbc:postgresql://postgres:5432/mushroom_iot
+      DATABASE_USER: mushroom
+      DATABASE_PASSWORD: mushroom123
+      JWT_SECRET: GodQvW25J10IZ8rSAckQEcG6qe7E9Vw0fW8p6AqcFCFNnl7JFSmaBBNRq8mg9s9y
+      CORS_ORIGIN: http://localhost:5173,http://localhost:3000
+      MQTT_BROKER_URL: tcp://mosquitto:1883
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:

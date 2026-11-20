@@ -51,11 +51,11 @@ public interface AlertRepository extends JpaRepository<Alert, Long> {
         Pageable pageable
     );
 
-    @Query("SELECT a FROM Alert a WHERE a.room.id = :roomId AND a.metric = :metric AND a.status = 'ACTIVE' LIMIT 1")
-    Optional<Alert> findActiveByRoomIdAndMetric(
-        @Param("roomId") Integer roomId,
-        @Param("metric") SensorType metric
-    );
+    Optional<Alert> findFirstByRoomIdAndMetricAndStatus(Integer roomId, SensorType metric, AlertStatus status);
+
+    default Optional<Alert> findActiveByRoomIdAndMetric(Integer roomId, SensorType metric) {
+        return findFirstByRoomIdAndMetricAndStatus(roomId, metric, AlertStatus.ACTIVE);
+    }
 
     long countByStatusAndIsReadFalse(AlertStatus status);
 }
