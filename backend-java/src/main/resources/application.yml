@@ -34,7 +34,11 @@ app:
 springdoc:
   api-docs:
     path: /v3/api-docs
+    enabled: true
   swagger-ui:
-    path: /api/docs
+    path: /swagger-ui.html
+    enabled: true
     operations-sorter: method
     tags-sorter: alpha
+    try-it-out-enabled: true
+    filter: true

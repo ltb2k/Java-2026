@@ -1,0 +1,40 @@
+server:
+  port: ${PORT:5000}
+
+spring:
+  application:
+    name: mushroom-iot-backend
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:${DATABASE_URL:jdbc:postgresql://localhost:5432/mushroom_iot}}
+    username: ${SPRING_DATASOURCE_USERNAME:${DATABASE_USER:mushroom}}
+    password: ${SPRING_DATASOURCE_PASSWORD:${DATABASE_PASSWORD:mushroom123}}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        physical_naming_strategy: org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy
+    open-in-view: false
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:GodQvW25J10IZ8rSAckQEcG6qe7E9Vw0fW8p6AqcFCFNnl7JFSmaBBNRq8mg9s9y}
+    access-expiration-ms: 28800000 # 8 hours
+    refresh-expiration-ms: 604800000 # 7 days
+  cors:
+    allowed-origins: ${CORS_ORIGIN:http://localhost:5173,http://localhost:3000}
+  mqtt:
+    broker-url: ${MQTT_BROKER_URL:}
+    client-id: mushroom_spring_backend
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /api/docs
+    operations-sorter: method
+    tags-sorter: alpha

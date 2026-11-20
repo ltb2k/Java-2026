@@ -82,6 +82,36 @@ class SecurityAndControllerTest {
     }
 
     @Test
+    void testSwaggerAndOpenApiEndpointsAccessibleWithoutToken() throws Exception {
+        // /swagger-ui/index.html returns 200 and serves HTML
+        mockMvc.perform(get("/swagger-ui/index.html"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_HTML));
+
+        // /v3/api-docs returns 200 and OpenAPI JSON
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.openapi").exists())
+                .andExpect(jsonPath("$.info.title").value("Mushroom IoT API (Spring Boot)"));
+
+        // /v3/api-docs/swagger-config returns 200 and Swagger config JSON
+        mockMvc.perform(get("/v3/api-docs/swagger-config"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.configUrl").exists());
+
+        // /swagger-ui.html redirects to /swagger-ui/index.html
+        mockMvc.perform(get("/swagger-ui.html"))
+                .andExpect(status().is3xxRedirection());
+
+        // /api/docs redirects to /swagger-ui/index.html
+        mockMvc.perform(get("/api/docs"))
+                .andExpect(status().isFound())
+                .andExpect(header().string("Location", "/swagger-ui/index.html"));
+    }
+
+    @Test
     void testProtectedEndpointWithoutTokenReturns401() throws Exception {
         mockMvc.perform(get("/api/users"))
                 .andExpect(status().isUnauthorized());

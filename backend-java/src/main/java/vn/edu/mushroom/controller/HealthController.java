@@ -3,6 +3,8 @@ package vn.edu.mushroom.controller;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -38,5 +40,13 @@ public class HealthController {
         resp.put("mqtt_connected", mqttService.isConnected());
         resp.put("timestamp", OffsetDateTime.now());
         return ResponseEntity.ok(resp);
+    }
+
+    @GetMapping({"/api/docs", "/api/docs/", "/docs", "/docs/"})
+    @Operation(summary = "Chuyển hướng đến giao diện Swagger UI")
+    public ResponseEntity<Void> redirectToSwagger() {
+        return ResponseEntity.status(HttpStatus.FOUND)
+                .header(HttpHeaders.LOCATION, "/swagger-ui/index.html")
+                .build();
     }
 }

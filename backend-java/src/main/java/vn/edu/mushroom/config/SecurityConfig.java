@@ -64,10 +64,15 @@ public class SecurityConfig {
                     "/api/auth/register",
                     "/api/auth/login",
                     "/api/auth/verify-email",
+                    "/v3/api-docs",
                     "/v3/api-docs/**",
-                    "/api/docs/**",
                     "/swagger-ui/**",
-                    "/swagger-ui.html"
+                    "/swagger-ui.html",
+                    "/swagger-resources/**",
+                    "/api/docs",
+                    "/api/docs/**",
+                    "/docs",
+                    "/docs/**"
                 ).permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/packages", "/api/packages/*").permitAll()
 
