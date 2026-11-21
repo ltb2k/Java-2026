@@ -4,6 +4,7 @@ import AdminLayout from './layouts/AdminLayout';
 import Dashboard from './pages/dashboard/Dashboard';
 import RentalRequests from './pages/rental-requests/RentalRequests';
 import Devices from './pages/devices/Devices';
+import Thresholds from './pages/thresholds/Thresholds';
 
 const INITIAL_ROOMS_DATA = [
   {
@@ -126,6 +127,29 @@ const INITIAL_DEVICES_DATA = [
   },
 ];
 
+const INITIAL_THRESHOLDS_DATA = {
+  1: {
+    tempMin: 22,
+    tempMax: 28,
+    humidityMin: 80,
+    humidityMax: 90,
+    co2Min: 600,
+    co2Max: 1200,
+    substrateMin: 55,
+    substrateMax: 70,
+  },
+  2: {
+    tempMin: 18,
+    tempMax: 24,
+    humidityMin: 82,
+    humidityMax: 92,
+    co2Min: 500,
+    co2Max: 1000,
+    substrateMin: 58,
+    substrateMax: 72,
+  },
+};
+
 const PAGE_TITLES = {
   dashboard: 'Giám sát IoT',
   'rooms-trays': 'Phòng & Khay',
@@ -154,6 +178,7 @@ export default function App() {
   const [role, setRole] = useState('Operator');
   const [rooms, setRooms] = useState(INITIAL_ROOMS_DATA);
   const [devices, setDevices] = useState(INITIAL_DEVICES_DATA);
+  const [thresholds, setThresholds] = useState(INITIAL_THRESHOLDS_DATA);
 
   const handleToggleRole = () => {
     setRole((prevRole) =>
@@ -182,6 +207,17 @@ export default function App() {
           rooms={rooms}
           devices={devices}
           setDevices={setDevices}
+        />
+      );
+    }
+
+    if (activeTab === 'thresholds') {
+      return (
+        <Thresholds
+          rooms={rooms}
+          devices={devices}
+          thresholds={thresholds}
+          setThresholds={setThresholds}
         />
       );
     }
