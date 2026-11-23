@@ -6,7 +6,7 @@ import RentalRequests from './pages/rental-requests/RentalRequests';
 import Devices from './pages/devices/Devices';
 import Thresholds from './pages/thresholds/Thresholds';
 import GrowthTracking from './pages/growth/GrowthTracking';
-
+import Harvest from './pages/harvest/Harvest';
 const INITIAL_ROOMS_DATA = [
   {
     id: 1,
@@ -227,6 +227,9 @@ export default function App() {
       return <GrowthTracking rooms={rooms} setRooms={setRooms} />;
     }
 
+    if (activeTab === 'harvest') {
+      return <Harvest rooms={rooms} setRooms={setRooms} />;
+    }
     return (
       <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
         <h2 className="text-lg font-semibold text-gray-800">
