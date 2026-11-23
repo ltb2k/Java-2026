@@ -5,6 +5,7 @@ import Dashboard from './pages/dashboard/Dashboard';
 import RentalRequests from './pages/rental-requests/RentalRequests';
 import Devices from './pages/devices/Devices';
 import Thresholds from './pages/thresholds/Thresholds';
+import GrowthTracking from './pages/growth/GrowthTracking';
 
 const INITIAL_ROOMS_DATA = [
   {
@@ -220,6 +221,10 @@ export default function App() {
           setThresholds={setThresholds}
         />
       );
+    }
+
+    if (activeTab === 'growth') {
+      return <GrowthTracking rooms={rooms} setRooms={setRooms} />;
     }
 
     return (
