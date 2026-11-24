@@ -9,6 +9,9 @@ import GrowthTracking from './pages/growth/GrowthTracking';
 import Harvest from './pages/harvest/Harvest';
 import Users from './pages/users/Users';
 import Packages from './pages/packages/Packages';
+import AuthPage from './pages/auth/AuthPage';
+import CustomerPortal from './pages/customer/CustomerPortal';
+
 const INITIAL_ROOMS_DATA = [
   {
     id: 1,
@@ -153,6 +156,85 @@ const INITIAL_THRESHOLDS_DATA = {
   },
 };
 
+const INITIAL_ACCOUNTS = [
+  {
+    id: 'USR-01',
+    fullName: 'Quản trị viên hệ thống',
+    email: 'admin@mushroom.vn',
+    phone: '0901000001',
+    password: '123456',
+    role: 'Admin',
+    accountType: 'Nhân viên',
+    status: 'Hoạt động',
+  },
+  {
+    id: 'USR-02',
+    fullName: 'Nhân viên vận hành trại',
+    email: 'operator@mushroom.vn',
+    phone: '0901000002',
+    password: '123456',
+    role: 'Operator',
+    accountType: 'Nhân viên',
+    status: 'Hoạt động',
+  },
+  {
+    id: 'USR-03',
+    fullName: 'Khách thuê #105',
+    email: 'khach105@mushroom.vn',
+    phone: '0901000105',
+    password: '123456',
+    role: 'Customer',
+    accountType: 'Khách hàng',
+    status: 'Hoạt động',
+  },
+  {
+    id: 'USR-04',
+    fullName: 'Tài khoản tạm khóa',
+    email: 'locked@mushroom.vn',
+    phone: '0901000999',
+    password: '123456',
+    role: 'Operator',
+    accountType: 'Nhân viên',
+    status: 'Không hoạt động',
+  },
+];
+
+const INITIAL_SHARED_PACKAGES = [
+  {
+    id: 'PKG-01',
+    name: 'Gói Trải Nghiệm Bào Ngư 30 Ngày',
+    mushroomType: 'Nấm Bào Ngư',
+    durationDays: 30,
+    trayCount: 1,
+    price: 350000,
+    status: 'Đang áp dụng',
+    description:
+      'Phù hợp cho khách hàng trải nghiệm thuê 1 khay nấm bào ngư, theo dõi nhiệt độ/độ ẩm trực tuyến và nhận thành phẩm cuối kỳ.',
+  },
+  {
+    id: 'PKG-02',
+    name: 'Gói Linh Chi Tiêu Chuẩn 45 Ngày',
+    mushroomType: 'Nấm Linh Chi',
+    durationDays: 45,
+    trayCount: 1,
+    price: 650000,
+    status: 'Đang áp dụng',
+    description:
+      'Chu kỳ nuôi trồng 45 ngày dành cho nấm Linh Chi với chế độ kiểm soát môi trường tự động và cập nhật sinh trưởng định kỳ.',
+  },
+  {
+    id: 'PKG-03',
+    name: 'Gói Gia Đình 3 Khay Linh Hoạt',
+    mushroomType: 'Nấm Bào Ngư / Linh Chi',
+    durationDays: 45,
+    trayCount: 3,
+    price: 1590000,
+    status: 'Đang áp dụng',
+    description:
+      'Gói tiết kiệm cho hộ gia đình hoặc nhóm khách thuê đồng thời 3 khay, tùy chọn kết hợp loại nấm theo phòng nuôi.',
+  },
+];
+
 const PAGE_TITLES = {
   dashboard: 'Giám sát IoT',
   'rooms-trays': 'Phòng & Khay',
@@ -182,6 +264,12 @@ export default function App() {
   const [rooms, setRooms] = useState(INITIAL_ROOMS_DATA);
   const [devices, setDevices] = useState(INITIAL_DEVICES_DATA);
   const [thresholds, setThresholds] = useState(INITIAL_THRESHOLDS_DATA);
+  const [accounts, setAccounts] = useState(INITIAL_ACCOUNTS);
+  const [sharedPackages] = useState(INITIAL_SHARED_PACKAGES);
+
+  const [currentUser, setCurrentUser] = useState(null);
+  const [showAuthScreen, setShowAuthScreen] = useState(false);
+  const [authNotice, setAuthNotice] = useState('');
 
   const handleToggleRole = () => {
     setRole((prevRole) =>
@@ -190,6 +278,53 @@ export default function App() {
 
     setActiveTab('dashboard');
   };
+
+  const handleLoginSuccess = (user) => {
+    setCurrentUser(user);
+    setShowAuthScreen(false);
+    if (user.role === 'Admin' || user.role === 'Operator') {
+      setRole(user.role);
+      setActiveTab('dashboard');
+      setAuthNotice(
+        `Đã đăng nhập bằng tài khoản ${user.fullName} (${user.role}).`
+      );
+    }
+  };
+
+  const handleRegisterCustomer = (newCustomer) => {
+    setAccounts((prev) => [newCustomer, ...prev]);
+    setCurrentUser(newCustomer);
+    setShowAuthScreen(false);
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    setRole('Operator');
+    setActiveTab('dashboard');
+    setAuthNotice('');
+    setShowAuthScreen(true);
+  };
+
+  if (currentUser?.role === 'Customer') {
+    return (
+      <CustomerPortal
+        currentUser={currentUser}
+        packages={sharedPackages}
+        onLogout={handleLogout}
+      />
+    );
+  }
+
+  if (showAuthScreen) {
+    return (
+      <AuthPage
+        accounts={accounts}
+        onLoginSuccess={handleLoginSuccess}
+        onRegisterCustomer={handleRegisterCustomer}
+        onBackToWorkspace={() => setShowAuthScreen(false)}
+      />
+    );
+  }
 
   const renderPage = () => {
     if (activeTab === 'dashboard') {
@@ -270,6 +405,37 @@ export default function App() {
       role={role}
       onToggleRole={handleToggleRole}
     >
+      <div className="mb-4 bg-white border border-gray-200 rounded-xl px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 shadow-sm">
+        <div className="text-xs text-gray-600">
+          {authNotice ? (
+            <span className="text-emerald-700 font-medium">{authNotice}</span>
+          ) : (
+            <span>
+              Luồng xác thực: Nhân viên do Admin cấp quyền • Khách hàng tự đăng
+              ký qua Email/SĐT + xác thực OTP.
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {currentUser && (
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="text-xs font-medium px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer"
+            >
+              Đăng xuất
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setShowAuthScreen(true)}
+            className="text-xs font-medium px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white transition cursor-pointer"
+          >
+            Đăng nhập / Đăng ký OTP
+          </button>
+        </div>
+      </div>
+
       {renderPage()}
     </AdminLayout>
   );
