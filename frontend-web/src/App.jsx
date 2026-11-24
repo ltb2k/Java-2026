@@ -8,7 +8,7 @@ import Thresholds from './pages/thresholds/Thresholds';
 import GrowthTracking from './pages/growth/GrowthTracking';
 import Harvest from './pages/harvest/Harvest';
 import Users from './pages/users/Users';
-
+import Packages from './pages/packages/Packages';
 const INITIAL_ROOMS_DATA = [
   {
     id: 1,
@@ -235,6 +235,10 @@ export default function App() {
 
     if (activeTab === 'users') {
       return <Users currentRole={role} />;
+    }
+
+    if (activeTab === 'packages') {
+      return <Packages currentRole={role} />;
     }
 
     return (
