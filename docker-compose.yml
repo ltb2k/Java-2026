@@ -1,11 +1,11 @@
 services:
   postgres:
-    image: postgres:16
+    image: postgres:16-alpine
     restart: unless-stopped
     environment:
       POSTGRES_DB: mushroom_iot
       POSTGRES_USER: mushroom
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mushroom123}
     ports:
       - "127.0.0.1:5432:5432"
     volumes:
@@ -20,13 +20,18 @@ services:
       start_period: 10s
 
   mosquitto:
-    image: eclipse-mosquitto:2
+    image: eclipse-mosquitto:2.0
     restart: unless-stopped
     ports:
       - "1883:1883"
       - "9001:9001"
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        echo -e "listener 1883\nallow_anonymous true\nlistener 9001\nprotocol websockets" > /mosquitto-no-auth.conf
+        /usr/sbin/mosquitto -c /mosquitto-no-auth.conf
     volumes:
-      - ./backend-java/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
       - mosquitto_data:/mosquitto/data
       - mosquitto_logs:/mosquitto/log
 
@@ -38,20 +43,20 @@ services:
     ports:
       - "5000:5000"
     environment:
+      PORT: 5000
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/mushroom_iot
       SPRING_DATASOURCE_USERNAME: mushroom
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
-      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-mushroom123}
+      JWT_SECRET: ${JWT_SECRET:-GodQvW25J10IZ8rSAckQEcG6qe7E9Vw0fW8p6AqcFCFNnl7JFSmaBBNRq8mg9s9y}
+      CORS_ORIGIN: http://localhost:5173,http://localhost:3000
       MQTT_BROKER_URL: tcp://mosquitto:1883
-      MQTT_USERNAME: ${MQTT_USERNAME:-}
-      MQTT_PASSWORD: ${MQTT_PASSWORD:-}
     depends_on:
       postgres:
         condition: service_healthy
       mosquitto:
         condition: service_started
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:5000/actuator/health || exit 1"]
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:5000/health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5

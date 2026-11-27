@@ -1,4 +1,4 @@
-﻿# 🍄 Hệ Thống Quản Lý Trồng Nấm Thông Minh — Java-2026
+# 🍄 Hệ Thống Quản Lý Trồng Nấm Thông Minh — Java-2026
 
 > **Mushroom IoT Smart Farm Management System**  
 > Backend: **Java 21 + Spring Boot 3.3** | Frontend: **React + Vite** | Mobile: **Flutter** | IoT: **ESP32 + MQTT**
