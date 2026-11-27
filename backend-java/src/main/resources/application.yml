@@ -26,7 +26,7 @@ app:
     access-expiration-ms: 28800000 # 8 hours
     refresh-expiration-ms: 604800000 # 7 days
   cors:
-    allowed-origins: ${CORS_ORIGIN:http://localhost:5173,http://localhost:3000}
+    allowed-origins: ${CORS_ORIGIN:http://localhost:5173,http://localhost:3000,https://mushroom-frontend-web.onrender.com}
   mqtt:
     broker-url: ${MQTT_BROKER_URL:}
     client-id: mushroom_spring_backend

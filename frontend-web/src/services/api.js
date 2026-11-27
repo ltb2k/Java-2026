@@ -1,5 +1,19 @@
-const RAW_BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
-const API_BASE = RAW_BASE ? `${RAW_BASE}/api` : '/api';
+const resolveApiBase = () => {
+  const envUrl = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '');
+  if (envUrl) {
+    const cleanRoot = envUrl.replace(/\/api$/, '');
+    return `${cleanRoot}/api`;
+  }
+  if (
+    typeof window !== 'undefined' &&
+    window.location.hostname.endsWith('.onrender.com')
+  ) {
+    return 'https://mushroom-backend-java.onrender.com/api';
+  }
+  return '/api';
+};
+
+const API_BASE = resolveApiBase();
 
 const TOKEN_KEY = 'mushroom_token';
 const REFRESH_TOKEN_KEY = 'mushroom_refresh_token';
