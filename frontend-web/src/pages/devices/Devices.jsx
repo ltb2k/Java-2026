@@ -1,459 +1,417 @@
-import React, { useState, useMemo } from "react";
+import React, { useMemo, useState } from 'react';
+import api from '../../services/api';
 
-const getNextDeviceId = (deviceList) => {
-  const maxNum = deviceList.reduce((max, item) => {
-    const match = String(item.id).match(/(\d+)$/);
-    const num = match ? Number(match[1]) : 0;
-    return num > max ? num : max;
-  }, 0);
-  return `DEV-${String(maxNum + 1).padStart(2, "0")}`;
+const STATUS_BADGE = {
+  ONLINE: 'bg-emerald-100 text-emerald-700',
+  OFFLINE: 'bg-slate-200 text-slate-600',
+  ERROR: 'bg-red-100 text-red-700',
 };
 
-export default function Devices({ rooms = [], devices = [], setDevices }) {
-  const defaultRoomId = rooms[0]?.id ?? 1;
+export default function Devices({ rooms = [], devices = [], onRefresh }) {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedRoom, setSelectedRoom] = useState('ALL');
+  const [selectedStatus, setSelectedStatus] = useState('ALL');
+  const [busyId, setBusyId] = useState(null);
+  const [errorMsg, setErrorMsg] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
 
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedRoom, setSelectedRoom] = useState("ALL");
-  const [selectedStatus, setSelectedStatus] = useState("ALL");
-
-  // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDevice, setEditingDevice] = useState(null);
   const [formData, setFormData] = useState({
-    name: "",
-    type: "sensor",
-    roomId: defaultRoomId,
-    mac: "",
-    status: "online",
+    name: '',
+    device_type: 'FAN',
+    room_id: rooms[0]?.id ?? '',
+    status: 'ONLINE',
+    is_on: false,
   });
 
-  // Thống kê
+  const [commandHistory, setCommandHistory] = useState(null);
+
   const stats = useMemo(() => {
-    const total = devices.length;
-    const online = devices.filter((d) => d.status === "online").length;
-    const offline = devices.filter((d) => d.status === "offline").length;
-    const activeActuators = devices.filter(
-      (d) => d.type === "actuator" && d.isOn
-    ).length;
-    return { total, online, offline, activeActuators };
+    return {
+      total: devices.length,
+      online: devices.filter((d) => d.status === 'ONLINE').length,
+      offline: devices.filter((d) => d.status === 'OFFLINE').length,
+      active: devices.filter((d) => d.is_on).length,
+    };
   }, [devices]);
 
-  // Lọc danh sách
   const filteredDevices = useMemo(() => {
-    return devices.filter((device) => {
+    const kw = searchTerm.trim().toLowerCase();
+    return devices.filter((d) => {
       const matchSearch =
-        device.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        device.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        device.mac.toLowerCase().includes(searchTerm.toLowerCase());
+        !kw ||
+        String(d.name || '').toLowerCase().includes(kw) ||
+        String(d.device_type || '').toLowerCase().includes(kw);
       const matchRoom =
-        selectedRoom === "ALL" || Number(device.roomId) === Number(selectedRoom);
+        selectedRoom === 'ALL' || Number(d.room_id) === Number(selectedRoom);
       const matchStatus =
-        selectedStatus === "ALL" || device.status === selectedStatus;
+        selectedStatus === 'ALL' || d.status === selectedStatus;
       return matchSearch && matchRoom && matchStatus;
     });
   }, [devices, searchTerm, selectedRoom, selectedStatus]);
 
-  // Lấy tên phòng từ danh sách rooms của App.jsx
-  const getRoomName = (roomId) => {
-    const found = rooms.find((r) => Number(r.id) === Number(roomId));
-    return found ? `${found.name} (${found.id})` : `Phòng #${roomId}`;
-  };
-
-  // Bật / Tắt thiết bị
-  const handleTogglePower = (id) => {
-    if (!setDevices) return;
-    setDevices((prev) =>
-      prev.map((dev) => {
-        if (dev.id !== id || dev.status === "offline") return dev;
-        const nextState = !dev.isOn;
-        return {
-          ...dev,
-          isOn: nextState,
-          reading:
-            dev.type === "actuator"
-              ? nextState
-                ? "Đang hoạt động"
-                : "Đang tắt"
-              : dev.reading,
-          lastUpdate: "Vừa xong",
-        };
-      })
-    );
-  };
-
-  // Mở modal Thêm / Sửa
-  const openAddModal = () => {
-    setEditingDevice(null);
-    setFormData({
-      name: "",
-      type: "sensor",
-      roomId: rooms[0]?.id ?? 1,
-      mac: "",
-      status: "online",
-    });
-    setIsModalOpen(true);
-  };
-
-  const openEditModal = (device) => {
-    setEditingDevice(device);
-    setFormData({
-      name: device.name,
-      type: device.type,
-      roomId: Number(device.roomId),
-      mac: device.mac,
-      status: device.status,
-    });
-    setIsModalOpen(true);
-  };
-
-  const handleSaveDevice = (e) => {
-    e.preventDefault();
-    if (!formData.name.trim() || !formData.mac.trim() || !setDevices) return;
-
-    const normalizedData = {
-      ...formData,
-      name: formData.name.trim(),
-      mac: formData.mac.trim(),
-      roomId: Number(formData.roomId),
-    };
-
-    if (editingDevice) {
-      setDevices((prev) =>
-        prev.map((dev) =>
-          dev.id === editingDevice.id
-            ? {
-                ...dev,
-                ...normalizedData,
-                isOn: normalizedData.status === "online" ? dev.isOn : false,
-                lastUpdate: "Vừa cập nhật",
-              }
-            : dev
-        )
-      );
-    } else {
-      const newDevice = {
-        id: getNextDeviceId(devices),
-        ...normalizedData,
-        isOn: normalizedData.status === "online",
-        reading:
-          normalizedData.status === "offline"
-            ? "Mất kết nối"
-            : normalizedData.type === "sensor"
-            ? "Đang đo..."
-            : "Sẵn sàng",
-        lastUpdate: "Vừa thêm",
-      };
-      setDevices((prev) => [newDevice, ...prev]);
+  const handleTogglePower = async (dev) => {
+    if (dev.status === 'OFFLINE') return;
+    setBusyId(`cmd-${dev.id}`);
+    setErrorMsg('');
+    setSuccessMsg('');
+    try {
+      const action = dev.is_on ? 'TURN_OFF' : 'TURN_ON';
+      await api.devices.sendCommand(dev.id, action, { source: 'web-devices' });
+      setSuccessMsg(`Đã gửi lệnh ${action} đến thiết bị "${dev.name}".`);
+      if (onRefresh) await onRefresh();
+    } catch (err) {
+      setErrorMsg(err.message);
+    } finally {
+      setBusyId(null);
     }
-    setIsModalOpen(false);
   };
 
-  const handleDeleteDevice = (id) => {
-    if (!setDevices) return;
-    if (window.confirm("Bạn có chắc muốn gỡ bỏ thiết bị này khỏi hệ thống?")) {
-      setDevices((prev) => prev.filter((dev) => dev.id !== id));
+  const handleSaveDevice = async (e) => {
+    e.preventDefault();
+    setBusyId('save');
+    setErrorMsg('');
+    setSuccessMsg('');
+    try {
+      const payload = {
+        name: formData.name.trim(),
+        device_type: formData.device_type.trim(),
+        room_id: formData.room_id ? Number(formData.room_id) : null,
+        status: formData.status,
+        is_on: Boolean(formData.is_on),
+      };
+      if (editingDevice) {
+        await api.devices.update(editingDevice.id, payload);
+        setSuccessMsg(`Đã cập nhật thiết bị "${payload.name}".`);
+      } else {
+        await api.devices.create(payload);
+        setSuccessMsg(`Đã thêm thiết bị "${payload.name}".`);
+      }
+      setIsModalOpen(false);
+      if (onRefresh) await onRefresh();
+    } catch (err) {
+      setErrorMsg(err.message);
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleDelete = async (dev) => {
+    if (!window.confirm(`Xóa thiết bị "${dev.name}"?`)) return;
+    setBusyId(`del-${dev.id}`);
+    setErrorMsg('');
+    setSuccessMsg('');
+    try {
+      await api.devices.remove(dev.id);
+      setSuccessMsg(`Đã xóa thiết bị "${dev.name}".`);
+      if (onRefresh) await onRefresh();
+    } catch (err) {
+      setErrorMsg(err.message);
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleViewCommands = async (dev) => {
+    try {
+      const logs = await api.devices.commands(dev.id);
+      setCommandHistory({ device: dev, logs: logs || [] });
+    } catch (err) {
+      setErrorMsg(err.message);
     }
   };
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800">
-            Quản lý thiết bị IoT
-          </h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Giám sát trạng thái kết nối ESP32, cảm biến và điều khiển thiết bị từng phòng (dữ liệu mô phỏng)
-          </p>
+      {errorMsg && (
+        <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm">
+          {errorMsg}
         </div>
-        <button
-          onClick={openAddModal}
-          className="px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 transition-colors"
-        >
-          + Thêm thiết bị mới
-        </button>
-      </div>
+      )}
+      {successMsg && (
+        <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg px-4 py-3 text-sm">
+          {successMsg}
+        </div>
+      )}
 
-      {/* Thẻ thống kê */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-          <p className="text-sm text-gray-500">Tổng thiết bị</p>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+          <p className="text-xs text-gray-500">Tổng thiết bị</p>
           <p className="text-2xl font-bold text-gray-800 mt-1">{stats.total}</p>
         </div>
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-          <p className="text-sm text-gray-500">Đang trực tuyến (Online)</p>
-          <p className="text-2xl font-bold text-emerald-600 mt-1">
-            {stats.online}
-          </p>
+        <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+          <p className="text-xs text-gray-500">Đang Online</p>
+          <p className="text-2xl font-bold text-emerald-600 mt-1">{stats.online}</p>
         </div>
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-          <p className="text-sm text-gray-500">Mất kết nối (Offline)</p>
-          <p className="text-2xl font-bold text-red-600 mt-1">{stats.offline}</p>
+        <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+          <p className="text-xs text-gray-500">Offline</p>
+          <p className="text-2xl font-bold text-slate-500 mt-1">{stats.offline}</p>
         </div>
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-          <p className="text-sm text-gray-500">Thiết bị đang chạy</p>
-          <p className="text-2xl font-bold text-blue-600 mt-1">
-            {stats.activeActuators}
-          </p>
+        <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+          <p className="text-xs text-gray-500">Đang bật (ON)</p>
+          <p className="text-2xl font-bold text-blue-600 mt-1">{stats.active}</p>
         </div>
       </div>
 
-      {/* Bộ lọc & Tìm kiếm */}
-      <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col md:flex-row gap-3">
-        <input
-          type="text"
-          placeholder="Tìm theo tên, mã thiết bị hoặc địa chỉ MAC..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-        />
-        <select
-          value={selectedRoom}
-          onChange={(e) =>
-            setSelectedRoom(
-              e.target.value === "ALL" ? "ALL" : Number(e.target.value)
-            )
-          }
-          className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
-        >
-          <option value="ALL">Tất cả phòng nuôi</option>
-          {rooms.map((room) => (
-            <option key={room.id} value={room.id}>
-              {room.name} ({room.id})
-            </option>
-          ))}
-        </select>
-        <select
-          value={selectedStatus}
-          onChange={(e) => setSelectedStatus(e.target.value)}
-          className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
-        >
-          <option value="ALL">Tất cả trạng thái</option>
-          <option value="online">Online</option>
-          <option value="offline">Offline</option>
-        </select>
-      </div>
+      <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <div className="flex flex-wrap gap-2">
+            <input
+              type="text"
+              placeholder="Tìm tên, loại thiết bị..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="px-3 py-2 rounded-lg border border-gray-300 text-xs"
+            />
+            <select
+              value={selectedRoom}
+              onChange={(e) => setSelectedRoom(e.target.value)}
+              className="px-3 py-2 rounded-lg border border-gray-300 text-xs bg-white"
+            >
+              <option value="ALL">Tất cả phòng</option>
+              {rooms.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name}
+                </option>
+              ))}
+            </select>
+            <select
+              value={selectedStatus}
+              onChange={(e) => setSelectedStatus(e.target.value)}
+              className="px-3 py-2 rounded-lg border border-gray-300 text-xs bg-white"
+            >
+              <option value="ALL">Tất cả trạng thái</option>
+              <option value="ONLINE">ONLINE</option>
+              <option value="OFFLINE">OFFLINE</option>
+              <option value="ERROR">ERROR</option>
+            </select>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setEditingDevice(null);
+              setFormData({
+                name: '',
+                device_type: 'FAN',
+                room_id: rooms[0]?.id ?? '',
+                status: 'ONLINE',
+                is_on: false,
+              });
+              setIsModalOpen(true);
+            }}
+            className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold cursor-pointer"
+          >
+            + Thêm thiết bị
+          </button>
+        </div>
 
-      {/* Bảng danh sách thiết bị */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-x-auto">
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-600 uppercase">
-              <th className="py-3 px-4">Mã / Thiết bị</th>
-              <th className="py-3 px-4">Phòng lắp đặt</th>
-              <th className="py-3 px-4">Loại</th>
-              <th className="py-3 px-4">Trạng thái</th>
-              <th className="py-3 px-4">Thông số / Hoạt động</th>
-              <th className="py-3 px-4">Điều khiển</th>
-              <th className="py-3 px-4 text-right">Thao tác</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100 text-sm">
-            {filteredDevices.length === 0 ? (
-              <tr>
-                <td colSpan="7" className="py-8 text-center text-gray-500">
-                  Không tìm thấy thiết bị nào phù hợp.
-                </td>
-              </tr>
-            ) : (
-              filteredDevices.map((device) => (
-                <tr key={device.id} className="hover:bg-gray-50">
-                  <td className="py-3 px-4">
-                    <div className="font-medium text-gray-900">{device.name}</div>
-                    <div className="text-xs text-gray-500">
-                      {device.id} • MAC: {device.mac}
-                    </div>
-                  </td>
-                  <td className="py-3 px-4 text-gray-700">
-                    {getRoomName(device.roomId)}
-                  </td>
-                  <td className="py-3 px-4">
-                    <span
-                      className={`px-2.5 py-1 rounded-full text-xs font-medium ${
-                        device.type === "sensor"
-                          ? "bg-purple-50 text-purple-700"
-                          : "bg-blue-50 text-blue-700"
-                      }`}
-                    >
-                      {device.type === "sensor" ? "Cảm biến" : "Điều khiển"}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4">
-                    <span
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
-                        device.status === "online"
-                          ? "bg-emerald-50 text-emerald-700"
-                          : "bg-red-50 text-red-700"
-                      }`}
-                    >
-                      <span
-                        className={`w-1.5 h-1.5 rounded-full ${
-                          device.status === "online"
-                            ? "bg-emerald-500"
-                            : "bg-red-500"
-                        }`}
-                      />
-                      {device.status === "online" ? "Online" : "Offline"}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4">
-                    <div className="font-medium text-gray-800">
-                      {device.reading}
-                    </div>
-                    <div className="text-xs text-gray-400">
-                      Cập nhật: {device.lastUpdate}
-                    </div>
-                  </td>
-                  <td className="py-3 px-4">
-                    {device.type === "actuator" ? (
+        {filteredDevices.length === 0 ? (
+          <p className="text-sm text-gray-500 py-6 text-center">Chưa có thiết bị phù hợp.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
+                <tr>
+                  <th className="px-4 py-3">ID</th>
+                  <th className="px-4 py-3">Tên thiết bị</th>
+                  <th className="px-4 py-3">Loại</th>
+                  <th className="px-4 py-3">Phòng</th>
+                  <th className="px-4 py-3">Kết nối</th>
+                  <th className="px-4 py-3">Điều khiển</th>
+                  <th className="px-4 py-3 text-right">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {filteredDevices.map((dev) => (
+                  <tr key={dev.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 text-gray-500">#{dev.id}</td>
+                    <td className="px-4 py-3 font-medium text-gray-800">{dev.name}</td>
+                    <td className="px-4 py-3 text-gray-600">{dev.device_type}</td>
+                    <td className="px-4 py-3 text-gray-600">{dev.room_name || `#${dev.room_id}`}</td>
+                    <td className="px-4 py-3">
+                      <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${STATUS_BADGE[dev.status] || 'bg-gray-100'}`}>
+                        {dev.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
                       <button
-                        disabled={device.status === "offline"}
-                        onClick={() => handleTogglePower(device.id)}
-                        className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
-                          device.status === "offline"
-                            ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                            : device.isOn
-                            ? "bg-emerald-600 text-white hover:bg-emerald-700"
-                            : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                        type="button"
+                        disabled={dev.status === 'OFFLINE' || busyId === `cmd-${dev.id}`}
+                        onClick={() => handleTogglePower(dev)}
+                        className={`px-3 py-1 rounded-lg text-xs font-semibold cursor-pointer disabled:opacity-50 ${
+                          dev.is_on
+                            ? 'bg-emerald-600 text-white'
+                            : 'bg-slate-200 text-slate-700'
                         }`}
                       >
-                        {device.isOn ? "Đang BẬT" : "Đang TẮT"}
+                        {busyId === `cmd-${dev.id}` ? '...' : dev.is_on ? 'ON' : 'OFF'}
                       </button>
-                    ) : (
-                      <span className="text-xs text-gray-400">Tự động đo</span>
-                    )}
-                  </td>
-                  <td className="py-3 px-4 text-right space-x-2">
-                    <button
-                      onClick={() => openEditModal(device)}
-                      className="text-blue-600 hover:underline text-xs font-medium"
-                    >
-                      Sửa
-                    </button>
-                    <button
-                      onClick={() => handleDeleteDevice(device.id)}
-                      className="text-red-600 hover:underline text-xs font-medium"
-                    >
-                      Xóa
-                    </button>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+                    </td>
+                    <td className="px-4 py-3 text-right space-x-2">
+                      <button
+                        type="button"
+                        onClick={() => handleViewCommands(dev)}
+                        className="text-xs text-slate-600 hover:underline cursor-pointer"
+                      >
+                        Lệnh
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingDevice(dev);
+                          setFormData({
+                            name: dev.name || '',
+                            device_type: dev.device_type || 'FAN',
+                            room_id: dev.room_id ?? '',
+                            status: dev.status || 'ONLINE',
+                            is_on: Boolean(dev.is_on),
+                          });
+                          setIsModalOpen(true);
+                        }}
+                        className="text-xs text-blue-600 hover:underline cursor-pointer"
+                      >
+                        Sửa
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busyId === `del-${dev.id}`}
+                        onClick={() => handleDelete(dev)}
+                        className="text-xs text-red-600 hover:underline cursor-pointer"
+                      >
+                        Xóa
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
-      {/* Modal Thêm / Sửa thiết bị */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl max-w-md w-full p-6 space-y-4 shadow-xl">
-            <h2 className="text-lg font-bold text-gray-800">
-              {editingDevice ? "Cập nhật thiết bị" : "Thêm thiết bị IoT mới"}
-            </h2>
-            <form onSubmit={handleSaveDevice} className="space-y-3">
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
+          <form
+            onSubmit={handleSaveDevice}
+            className="bg-white rounded-2xl p-6 w-full max-w-md space-y-4 shadow-xl"
+          >
+            <h3 className="text-base font-bold text-gray-800">
+              {editingDevice ? 'Cập nhật thiết bị' : 'Thêm thiết bị IoT mới'}
+            </h3>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Tên thiết bị</label>
+              <input
+                type="text"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm"
+                required
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  Tên thiết bị
-                </label>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Loại thiết bị</label>
                 <input
                   type="text"
+                  value={formData.device_type}
+                  onChange={(e) => setFormData({ ...formData, device_type: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm"
+                  placeholder="FAN / MIST / LED / SENSOR"
                   required
-                  placeholder="VD: Quạt hút phòng 1"
-                  value={formData.name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, name: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Loại thiết bị
-                  </label>
-                  <select
-                    value={formData.type}
-                    onChange={(e) =>
-                      setFormData({ ...formData, type: e.target.value })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
-                  >
-                    <option value="sensor">Cảm biến (Sensor)</option>
-                    <option value="actuator">Thiết bị điều khiển</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Phòng lắp đặt
-                  </label>
-                  <select
-                    value={formData.roomId}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        roomId: Number(e.target.value),
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
-                  >
-                    {rooms.map((room) => (
-                      <option key={room.id} value={room.id}>
-                        {room.name} ({room.id})
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Phòng trồng</label>
+                <select
+                  value={formData.room_id}
+                  onChange={(e) => setFormData({ ...formData, room_id: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm bg-white"
+                >
+                  {rooms.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.name}
+                    </option>
+                  ))}
+                </select>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Địa chỉ MAC / Node ID
-                  </label>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Trạng thái</label>
+                <select
+                  value={formData.status}
+                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm bg-white"
+                >
+                  <option value="ONLINE">ONLINE</option>
+                  <option value="OFFLINE">OFFLINE</option>
+                  <option value="ERROR">ERROR</option>
+                </select>
+              </div>
+              <div className="flex items-end pb-2">
+                <label className="flex items-center gap-2 text-xs font-medium text-gray-700 cursor-pointer">
                   <input
-                    type="text"
-                    required
-                    placeholder="AA:BB:CC:11:22:05"
-                    value={formData.mac}
-                    onChange={(e) =>
-                      setFormData({ ...formData, mac: e.target.value })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                    type="checkbox"
+                    checked={formData.is_on}
+                    onChange={(e) => setFormData({ ...formData, is_on: e.target.checked })}
                   />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Trạng thái kết nối
-                  </label>
-                  <select
-                    value={formData.status}
-                    onChange={(e) =>
-                      setFormData({ ...formData, status: e.target.value })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
-                  >
-                    <option value="online">Online</option>
-                    <option value="offline">Offline</option>
-                  </select>
-                </div>
+                  Đang bật (ON)
+                </label>
               </div>
-              <div className="flex justify-end gap-2 pt-3 border-t border-gray-100">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg"
-                >
-                  Hủy
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 text-sm bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700"
-                >
-                  {editingDevice ? "Lưu thay đổi" : "Thêm thiết bị"}
-                </button>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(false)}
+                className="px-4 py-2 rounded-lg bg-gray-100 text-gray-700 text-xs font-medium cursor-pointer"
+              >
+                Hủy
+              </button>
+              <button
+                type="submit"
+                disabled={busyId === 'save'}
+                className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-xs font-semibold cursor-pointer"
+              >
+                {busyId === 'save' ? 'Đang lưu...' : 'Lưu thiết bị'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {commandHistory && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-lg space-y-4 shadow-xl">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-bold text-gray-800">
+                Lịch sử lệnh MQTT — {commandHistory.device.name}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setCommandHistory(null)}
+                className="text-xs text-gray-500 hover:text-gray-800 cursor-pointer"
+              >
+                Đóng
+              </button>
+            </div>
+            {commandHistory.logs.length === 0 ? (
+              <p className="text-xs text-gray-500 py-4">Chưa có lệnh nào được gửi đến thiết bị này.</p>
+            ) : (
+              <div className="max-h-72 overflow-y-auto divide-y divide-gray-100 text-xs">
+                {commandHistory.logs.map((cmd) => (
+                  <div key={cmd.id} className="py-2 flex justify-between">
+                    <div>
+                      <span className="font-semibold text-gray-800">{cmd.action}</span>{' '}
+                      <span className="text-gray-500">({cmd.status})</span>
+                    </div>
+                    <span className="text-gray-400">
+                      {cmd.created_at ? new Date(cmd.created_at).toLocaleString('vi-VN') : ''}
+                    </span>
+                  </div>
+                ))}
               </div>
-            </form>
+            )}
           </div>
         </div>
       )}

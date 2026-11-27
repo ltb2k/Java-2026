@@ -20,7 +20,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
 
   void _load() {
     setState(() {
-      traysFuture = api.availableTrays();
+      traysFuture = api.myTrays();
     });
   }
 
@@ -40,11 +40,11 @@ class _BrowseScreenState extends State<BrowseScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (ctx) {
-        String? selectedPkgId = packages.isNotEmpty ? packages.first['id'] as String? : null;
+        int? selectedPkgId = packages.isNotEmpty ? (packages.first['id'] as num?)?.toInt() : null;
         return StatefulBuilder(
           builder: (ctx, setModalState) {
             final selectedPkg = packages.firstWhere(
-              (p) => p['id'] == selectedPkgId,
+              (p) => (p['id'] as num?)?.toInt() == selectedPkgId,
               orElse: () => null,
             );
 

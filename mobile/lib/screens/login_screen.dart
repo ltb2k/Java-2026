@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/api_service.dart';
 import 'home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -9,21 +10,55 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _emailController = TextEditingController(text: 'customer@mushroom.local');
-  final _passwordController = TextEditingController(text: 'Customer@123');
+  final _api = ApiService();
+  final _nameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
   bool _isLoginMode = true;
+  bool _loading = false;
 
-  void _submit() {
-    if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
+  Future<void> _submit() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+    final fullName = _nameController.text.trim();
+
+    if (email.isEmpty || password.isEmpty || (!_isLoginMode && fullName.isEmpty)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vui lòng nhập đầy đủ Email và Mật khẩu')),
+        const SnackBar(content: Text('Vui lòng nhập đầy đủ thông tin.')),
       );
       return;
     }
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => const HomeScreen()),
-    );
+
+    setState(() => _loading = true);
+    try {
+      if (!_isLoginMode) {
+        await _api.register(fullName, email, password);
+      }
+      await _api.login(email, password);
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const HomeScreen()),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceFirst('Exception: ', '')),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
   }
 
   @override
@@ -61,10 +96,23 @@ class _LoginScreenState extends State<LoginScreen> {
                       style: TextStyle(color: Colors.grey[600]),
                     ),
                     const SizedBox(height: 24),
+                    if (!_isLoginMode) ...[
+                      TextField(
+                        controller: _nameController,
+                        decoration: const InputDecoration(
+                          labelText: 'Họ và tên',
+                          prefixIcon: Icon(Icons.person_outline),
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
                     TextField(
                       controller: _emailController,
+                      keyboardType: TextInputType.emailAddress,
                       decoration: const InputDecoration(
                         labelText: 'Email',
+                        hintText: 'customer@mushroom.local',
                         prefixIcon: Icon(Icons.email_outlined),
                         border: OutlineInputBorder(),
                       ),
@@ -91,11 +139,14 @@ class _LoginScreenState extends State<LoginScreen> {
                             borderRadius: BorderRadius.circular(10),
                           ),
                         ),
-                        onPressed: _submit,
-                        child: Text(
-                          _isLoginMode ? 'ĐĂNG NHẬP' : 'ĐĂNG KÝ NGAY',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
+                        onPressed: _loading ? null : _submit,
+                        child: _loading
+                            ? const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              )
+                            : Text(_isLoginMode ? 'Đăng nhập' : 'Đăng ký'),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -104,7 +155,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: Text(
                         _isLoginMode
                             ? 'Chưa có tài khoản? Đăng ký ngay'
-                            : 'Đã có tài khoản? Quay lại đăng nhập',
+                            : 'Đã có tài khoản? Đăng nhập',
                       ),
                     ),
                   ],

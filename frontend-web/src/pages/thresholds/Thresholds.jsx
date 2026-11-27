@@ -1,388 +1,155 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState } from 'react';
+import api from '../../services/api';
 
-const DEFAULT_ROOM_THRESHOLD = {
-  tempMin: 22,
-  tempMax: 28,
-  humidityMin: 80,
-  humidityMax: 90,
-  co2Min: 600,
-  co2Max: 1200,
-  substrateMin: 55,
-  substrateMax: 70,
+const METRIC_LABELS = {
+  TEMPERATURE: { label: 'Nhiệt độ', unit: '°C' },
+  HUMIDITY: { label: 'Độ ẩm không khí', unit: '%' },
+  CO2: { label: 'Nồng độ CO₂', unit: 'ppm' },
 };
 
-const THRESHOLD_FIELDS = [
-  {
-    key: "temperature",
-    label: "Nhiệt độ",
-    unit: "°C",
-    minKey: "tempMin",
-    maxKey: "tempMax",
-    minBound: 0,
-    maxBound: 80,
-    step: "0.5",
-  },
-  {
-    key: "humidity",
-    label: "Độ ẩm không khí",
-    unit: "%",
-    minKey: "humidityMin",
-    maxKey: "humidityMax",
-    minBound: 0,
-    maxBound: 100,
-    step: "1",
-  },
-  {
-    key: "co2",
-    label: "CO₂",
-    unit: "ppm",
-    minKey: "co2Min",
-    maxKey: "co2Max",
-    minBound: 0,
-    maxBound: 10000,
-    step: "50",
-  },
-  {
-    key: "substrateMoisture",
-    label: "Độ ẩm giá thể",
-    unit: "%",
-    minKey: "substrateMin",
-    maxKey: "substrateMax",
-    minBound: 0,
-    maxBound: 100,
-    step: "1",
-  },
-];
-
-function getRoomThresholdConfig(thresholds, roomId) {
-  return {
-    ...DEFAULT_ROOM_THRESHOLD,
-    ...(thresholds?.[roomId] || {}),
-  };
-}
-
-export default function Thresholds({
-  rooms = [],
-  devices = [],
-  thresholds = {},
-  setThresholds,
-}) {
-  const [selectedRoomId, setSelectedRoomId] = useState(() =>
-    rooms.length > 0 ? Number(rooms[0].id) : null
-  );
+export default function Thresholds({ thresholds = [], alerts = [], onRefresh }) {
+  const [forms, setForms] = useState({});
+  const [busyMetric, setBusyMetric] = useState(null);
+  const [errorMsg, setErrorMsg] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
 
   useEffect(() => {
-    if (!rooms || rooms.length === 0) {
-      setSelectedRoomId(null);
+    const map = {};
+    (thresholds || []).forEach((t) => {
+      map[t.metric] = {
+        lower_bound: t.lower_bound ?? 0,
+        upper_bound: t.upper_bound ?? 100,
+        unit: t.unit || METRIC_LABELS[t.metric]?.unit || '',
+      };
+    });
+    setForms(map);
+  }, [thresholds]);
+
+  const handleSave = async (metric) => {
+    const item = forms[metric];
+    if (!item) return;
+    if (Number(item.lower_bound) >= Number(item.upper_bound)) {
+      setErrorMsg(`Ngưỡng dưới phải nhỏ hơn ngưỡng trên cho chỉ số ${metric}.`);
       return;
     }
 
-    const exists = rooms.some((r) => Number(r.id) === Number(selectedRoomId));
-    if (!exists) {
-      setSelectedRoomId(Number(rooms[0].id));
+    setBusyMetric(metric);
+    setErrorMsg('');
+    setSuccessMsg('');
+    try {
+      await api.alerts.updateThreshold(metric, {
+        lower_bound: Number(item.lower_bound),
+        upper_bound: Number(item.upper_bound),
+        unit: item.unit,
+      });
+      setSuccessMsg(`Đã cập nhật ngưỡng ${METRIC_LABELS[metric]?.label || metric}.`);
+      if (onRefresh) await onRefresh();
+    } catch (err) {
+      setErrorMsg(err.message);
+    } finally {
+      setBusyMetric(null);
     }
-  }, [rooms, selectedRoomId]);
-
-  const [formValues, setFormValues] = useState(() =>
-    getRoomThresholdConfig(thresholds, rooms[0]?.id ?? 1)
-  );
-  const [errorMsg, setErrorMsg] = useState("");
-  const [savedNotice, setSavedNotice] = useState("");
-
-  useEffect(() => {
-    if (selectedRoomId == null) return;
-    setFormValues(getRoomThresholdConfig(thresholds, selectedRoomId));
-    setErrorMsg("");
-    setSavedNotice("");
-  }, [selectedRoomId]);
-
-  if (!rooms || rooms.length === 0 || selectedRoomId == null) {
-    return (
-      <div className="rounded-xl border border-slate-200 bg-white p-6 text-center shadow-sm">
-        <h2 className="text-base font-semibold text-slate-800">
-          Chưa có phòng nuôi nào
-        </h2>
-        <p className="mt-1 text-sm text-slate-500">
-          Vui lòng thêm phòng nuôi trước khi thiết lập ngưỡng môi trường.
-        </p>
-      </div>
-    );
-  }
-
-  const currentRoom = rooms.find((r) => Number(r.id) === Number(selectedRoomId));
-  const roomDevices = devices.filter(
-    (d) => Number(d.roomId) === Number(selectedRoomId)
-  );
-
-  // Dữ liệu cảm biến mô phỏng (chưa phải dữ liệu IoT/ESP32 thật)
-  const simulatedMetrics = {
-    temperature: 26.5,
-    humidity: 84,
-    co2: 1350,
-    substrateMoisture: 62,
-  };
-
-  const activeConfig = getRoomThresholdConfig(thresholds, selectedRoomId);
-  const warnings = [];
-
-  if (simulatedMetrics.temperature < activeConfig.tempMin) {
-    warnings.push(
-      `Nhiệt độ (${simulatedMetrics.temperature}°C) thấp hơn ngưỡng tối thiểu (${activeConfig.tempMin}°C)`
-    );
-  } else if (simulatedMetrics.temperature > activeConfig.tempMax) {
-    warnings.push(
-      `Nhiệt độ (${simulatedMetrics.temperature}°C) vượt ngưỡng tối đa (${activeConfig.tempMax}°C)`
-    );
-  }
-
-  if (simulatedMetrics.humidity < activeConfig.humidityMin) {
-    warnings.push(
-      `Độ ẩm không khí (${simulatedMetrics.humidity}%) thấp hơn ngưỡng tối thiểu (${activeConfig.humidityMin}%)`
-    );
-  } else if (simulatedMetrics.humidity > activeConfig.humidityMax) {
-    warnings.push(
-      `Độ ẩm không khí (${simulatedMetrics.humidity}%) vượt ngưỡng tối đa (${activeConfig.humidityMax}%)`
-    );
-  }
-
-  if (simulatedMetrics.co2 < activeConfig.co2Min) {
-    warnings.push(
-      `CO₂ (${simulatedMetrics.co2} ppm) thấp hơn ngưỡng tối thiểu (${activeConfig.co2Min} ppm)`
-    );
-  } else if (simulatedMetrics.co2 > activeConfig.co2Max) {
-    warnings.push(
-      `CO₂ (${simulatedMetrics.co2} ppm) vượt ngưỡng tối đa (${activeConfig.co2Max} ppm)`
-    );
-  }
-
-  if (simulatedMetrics.substrateMoisture < activeConfig.substrateMin) {
-    warnings.push(
-      `Độ ẩm giá thể (${simulatedMetrics.substrateMoisture}%) thấp hơn ngưỡng tối thiểu (${activeConfig.substrateMin}%)`
-    );
-  } else if (simulatedMetrics.substrateMoisture > activeConfig.substrateMax) {
-    warnings.push(
-      `Độ ẩm giá thể (${simulatedMetrics.substrateMoisture}%) vượt ngưỡng tối đa (${activeConfig.substrateMax}%)`
-    );
-  }
-
-  const handleRoomSelect = (e) => {
-    const nextRoomId = Number(e.target.value);
-    setSelectedRoomId(nextRoomId);
-  };
-
-  const handleFieldChange = (fieldKey, rawValue) => {
-    setErrorMsg("");
-    setSavedNotice("");
-    setFormValues((prev) => ({
-      ...prev,
-      [fieldKey]: rawValue === "" ? "" : Number(rawValue),
-    }));
-  };
-
-  const handleSave = (e) => {
-    e.preventDefault();
-    setErrorMsg("");
-    setSavedNotice("");
-
-    for (const field of THRESHOLD_FIELDS) {
-      const minVal = formValues[field.minKey];
-      const maxVal = formValues[field.maxKey];
-
-      if (
-        minVal === "" ||
-        maxVal === "" ||
-        Number.isNaN(Number(minVal)) ||
-        Number.isNaN(Number(maxVal))
-      ) {
-        setErrorMsg(
-          `Vui lòng nhập đầy đủ ngưỡng tối thiểu và tối đa cho ${field.label}.`
-        );
-        return;
-      }
-
-      const numMin = Number(minVal);
-      const numMax = Number(maxVal);
-
-      if (
-        numMin < field.minBound ||
-        numMin > field.maxBound ||
-        numMax < field.minBound ||
-        numMax > field.maxBound
-      ) {
-        setErrorMsg(
-          `${field.label} phải nằm trong khoảng ${field.minBound} – ${field.maxBound} ${field.unit}.`
-        );
-        return;
-      }
-
-      if (numMin > numMax) {
-        setErrorMsg(
-          `Ngưỡng tối thiểu không được lớn hơn ngưỡng tối đa ở mục ${field.label}.`
-        );
-        return;
-      }
-    }
-
-    const normalizedConfig = {
-      tempMin: Number(formValues.tempMin),
-      tempMax: Number(formValues.tempMax),
-      humidityMin: Number(formValues.humidityMin),
-      humidityMax: Number(formValues.humidityMax),
-      co2Min: Number(formValues.co2Min),
-      co2Max: Number(formValues.co2Max),
-      substrateMin: Number(formValues.substrateMin),
-      substrateMax: Number(formValues.substrateMax),
-    };
-
-    const numericRoomId = Number(selectedRoomId);
-
-    setThresholds((prev) => ({
-      ...prev,
-      [numericRoomId]: normalizedConfig,
-    }));
-    setFormValues(normalizedConfig);
-    setSavedNotice(
-      `Đã lưu cấu hình ngưỡng cho ${currentRoom?.name || `Phòng #${numericRoomId}`}.`
-    );
   };
 
   return (
     <div className="space-y-6">
-      {/* Chọn phòng nuôi */}
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="text-base font-semibold text-slate-800">
-              Chọn phòng nuôi
-            </h2>
-            <p className="text-sm text-slate-500">
-              Cấu hình ngưỡng riêng từng phòng ({roomDevices.length} thiết bị thuộc phòng)
-            </p>
-          </div>
-
-          <select
-            value={selectedRoomId}
-            onChange={handleRoomSelect}
-            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-emerald-500 focus:outline-none"
-          >
-            {rooms.map((room) => (
-              <option key={room.id} value={Number(room.id)}>
-                {room.name} (ID: {room.id})
-              </option>
-            ))}
-          </select>
+      {errorMsg && (
+        <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm">
+          {errorMsg}
         </div>
-      </div>
-
-      {/* Cảnh báo vượt ngưỡng (từ dữ liệu mô phỏng) */}
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-base font-semibold text-slate-800">
-            Cảnh báo vượt ngưỡng
-          </h3>
-          <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
-            Dữ liệu cảm biến mô phỏng (chưa nối IoT thật)
-          </span>
+      )}
+      {successMsg && (
+        <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg px-4 py-3 text-sm">
+          {successMsg}
         </div>
+      )}
 
-        {warnings.length > 0 ? (
-          <ul className="mt-3 space-y-2">
-            {warnings.map((item, idx) => (
-              <li
-                key={idx}
-                className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800"
-              >
-                {item}
-              </li>
-            ))}
-          </ul>
+      <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+        <h3 className="text-base font-semibold text-gray-800 mb-4">
+          Cấu hình ngưỡng cảnh báo môi trường
+        </h3>
+        {thresholds.length === 0 ? (
+          <p className="text-sm text-gray-500">Chưa có cấu hình ngưỡng trong cơ sở dữ liệu.</p>
         ) : (
-          <p className="mt-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-            Các chỉ số mô phỏng hiện tại đang nằm trong ngưỡng đã lưu.
-          </p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {thresholds.map((t) => {
+              const form = forms[t.metric] || {};
+              const meta = METRIC_LABELS[t.metric] || { label: t.metric, unit: t.unit };
+              return (
+                <div key={t.metric} className="border border-gray-200 rounded-xl p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-semibold text-sm text-gray-800">{meta.label}</h4>
+                    <span className="text-xs text-gray-500">{form.unit || meta.unit}</span>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">Ngưỡng dưới</label>
+                    <input
+                      type="number"
+                      step="0.5"
+                      value={form.lower_bound ?? ''}
+                      onChange={(e) =>
+                        setForms((prev) => ({
+                          ...prev,
+                          [t.metric]: { ...prev[t.metric], lower_bound: e.target.value },
+                        }))
+                      }
+                      className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">Ngưỡng trên</label>
+                    <input
+                      type="number"
+                      step="0.5"
+                      value={form.upper_bound ?? ''}
+                      onChange={(e) =>
+                        setForms((prev) => ({
+                          ...prev,
+                          [t.metric]: { ...prev[t.metric], upper_bound: e.target.value },
+                        }))
+                      }
+                      className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    disabled={busyMetric === t.metric}
+                    onClick={() => handleSave(t.metric)}
+                    className="w-full py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold cursor-pointer disabled:opacity-60"
+                  >
+                    {busyMetric === t.metric ? 'Đang lưu...' : 'Lưu ngưỡng'}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
         )}
       </div>
 
-      {/* Form cấu hình 4 thông số Min / Max */}
-      <form
-        onSubmit={handleSave}
-        className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
-      >
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {THRESHOLD_FIELDS.map((field) => (
-            <div
-              key={field.key}
-              className="rounded-lg border border-slate-200 bg-slate-50/60 p-4"
-            >
-              <div className="mb-3 flex items-center justify-between">
-                <span className="font-semibold text-slate-800">
-                  {field.label}
-                </span>
-                <span className="rounded bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-700">
-                  {field.unit} ({field.minBound}–{field.maxBound})
+      <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+        <h3 className="text-base font-semibold text-gray-800 mb-3">
+          Cảnh báo vượt ngưỡng gần đây ({alerts.length})
+        </h3>
+        {alerts.length === 0 ? (
+          <p className="text-sm text-gray-500">Không có cảnh báo nào.</p>
+        ) : (
+          <div className="divide-y divide-gray-100 text-sm">
+            {alerts.slice(0, 15).map((al) => (
+              <div key={al.id} className="py-2.5 flex items-center justify-between gap-4">
+                <div>
+                  <p className="font-medium text-gray-800">
+                    [{al.severity}] {al.title}
+                  </p>
+                  <p className="text-xs text-gray-500">{al.message}</p>
+                </div>
+                <span className="text-xs px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 shrink-0">
+                  {al.status}
                 </span>
               </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-600">
-                    Ngưỡng tối thiểu (Min)
-                  </label>
-                  <input
-                    type="number"
-                    min={field.minBound}
-                    max={field.maxBound}
-                    step={field.step}
-                    value={formValues[field.minKey]}
-                    onChange={(e) =>
-                      handleFieldChange(field.minKey, e.target.value)
-                    }
-                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-emerald-500 focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-600">
-                    Ngưỡng tối đa (Max)
-                  </label>
-                  <input
-                    type="number"
-                    min={field.minBound}
-                    max={field.maxBound}
-                    step={field.step}
-                    value={formValues[field.maxKey]}
-                    onChange={(e) =>
-                      handleFieldChange(field.maxKey, e.target.value)
-                    }
-                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-emerald-500 focus:outline-none"
-                  />
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {errorMsg && (
-          <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-            {errorMsg}
-          </p>
+            ))}
+          </div>
         )}
-
-        {savedNotice && (
-          <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-            {savedNotice}
-          </p>
-        )}
-
-        <div className="flex justify-end pt-2">
-          <button
-            type="submit"
-            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
-          >
-            Lưu cấu hình
-          </button>
-        </div>
-      </form>
+      </div>
     </div>
   );
 }

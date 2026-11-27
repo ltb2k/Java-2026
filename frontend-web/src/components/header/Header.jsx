@@ -19,8 +19,8 @@ export default function Header({
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <span className="bg-amber-50 text-amber-700 border border-amber-200 text-xs font-medium px-3 py-1.5 rounded-full">
-          ● Chưa kết nối Backend
+        <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-medium px-3 py-1.5 rounded-full">
+          ● Đã kết nối Backend Java
         </span>
 
         {onToggleRole ? (

@@ -1,17 +1,22 @@
+name: mushroom-iot
+
 services:
   postgres:
     image: postgres:16-alpine
+    container_name: mushroom-postgres
     restart: unless-stopped
     environment:
       POSTGRES_DB: mushroom_iot
       POSTGRES_USER: mushroom
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mushroom123}
     ports:
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:5433:5432"
     volumes:
       - mushroom_pgdata:/var/lib/postgresql/data
       - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
       - ./database/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+    networks:
+      - mushroom-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
       interval: 5s
@@ -21,6 +26,7 @@ services:
 
   mosquitto:
     image: eclipse-mosquitto:2.0
+    container_name: mushroom-mosquitto
     restart: unless-stopped
     ports:
       - "1883:1883"
@@ -34,29 +40,34 @@ services:
     volumes:
       - mosquitto_data:/mosquitto/data
       - mosquitto_logs:/mosquitto/log
+    networks:
+      - mushroom-network
 
   backend:
     build:
       context: ./backend-java
       dockerfile: Dockerfile
+    container_name: mushroom-backend-java
     restart: unless-stopped
     ports:
-      - "5000:5000"
+      - "5001:5001"
     environment:
-      PORT: 5000
+      PORT: 5001
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/mushroom_iot
       SPRING_DATASOURCE_USERNAME: mushroom
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-mushroom123}
       JWT_SECRET: ${JWT_SECRET:-GodQvW25J10IZ8rSAckQEcG6qe7E9Vw0fW8p6AqcFCFNnl7JFSmaBBNRq8mg9s9y}
-      CORS_ORIGIN: http://localhost:5173,http://localhost:3000
+      CORS_ORIGIN: http://localhost:5173,http://localhost:3000,http://127.0.0.1:3000
       MQTT_BROKER_URL: tcp://mosquitto:1883
     depends_on:
       postgres:
         condition: service_healthy
       mosquitto:
         condition: service_started
+    networks:
+      - mushroom-network
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://localhost:5000/health || exit 1"]
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:5001/health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -66,16 +77,29 @@ services:
     build:
       context: ./frontend-web
       dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost:5001
+    container_name: mushroom-frontend-web
     restart: unless-stopped
     ports:
       - "3000:80"
     depends_on:
       backend:
-        condition: service_started
+        condition: service_healthy
+    networks:
+      - mushroom-network
     environment:
-      VITE_API_URL: http://localhost:5000
+      VITE_API_URL: http://localhost:5001
+
+networks:
+  mushroom-network:
+    name: mushroom-network
+    driver: bridge
 
 volumes:
   mushroom_pgdata:
+    name: backend-java_pgdata
   mosquitto_data:
+    name: mushroom_mosquitto_data
   mosquitto_logs:
+    name: mushroom_mosquitto_logs

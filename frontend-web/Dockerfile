@@ -4,7 +4,7 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --frozen-lockfile
 COPY . .
-ARG VITE_API_URL=http://localhost:5000
+ARG VITE_API_URL=http://localhost:5001
 ENV VITE_API_URL=${VITE_API_URL}
 RUN npm run build
 

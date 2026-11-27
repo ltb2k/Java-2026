@@ -9,7 +9,7 @@
 
 ```
 Java-2026/
-├── backend-java/        ← Spring Boot Java Backend (port 5000)
+├── backend-java/        ← Spring Boot Java Backend (port 5001)
 │   ├── src/main/java/vn/edu/mushroom/
 │   │   ├── controller/  ← REST Controllers
 │   │   ├── service/     ← Business Logic
@@ -82,8 +82,8 @@ Các service sẽ khởi chạy theo thứ tự: **PostgreSQL → Mosquitto MQTT
 
 | Service   | URL                                    |
 |-----------|----------------------------------------|
-| Backend   | http://localhost:5000                  |
-| Swagger   | http://localhost:5000/swagger-ui/index.html |
+| Backend   | http://localhost:5001                  |
+| Swagger   | http://localhost:5001/swagger-ui/index.html |
 | Frontend  | http://localhost:3000                  |
 | MQTT      | tcp://localhost:1883                   |
 
@@ -148,7 +148,7 @@ flutter run
 | Alerts            | `GET /api/v1/alerts`         | Cảnh báo                  |
 | Users             | `GET /api/v1/users`          | Quản lý người dùng        |
 
-📖 **Swagger UI đầy đủ:** http://localhost:5000/swagger-ui/index.html
+📖 **Swagger UI đầy đủ:** http://localhost:5001/swagger-ui/index.html
 
 ---
 

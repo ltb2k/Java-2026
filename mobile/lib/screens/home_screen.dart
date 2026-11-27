@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../models/mushroom_models.dart';
+import '../services/api_service.dart';
 import 'login_screen.dart';
 import 'tray_detail_screen.dart';
 
@@ -11,230 +11,193 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  final _api = ApiService();
   int _selectedIndex = 0;
 
-  final List<RentalPackage> _packages = [
-    RentalPackage(
-      id: 'PKG-01',
-      name: 'Gói Nấm Bào Ngư Xám Tiêu Chuẩn',
-      mushroomType: 'Nấm Bào Ngư Xám',
-      durationDays: 30,
-      price: 350000,
-      description: 'Bao gồm 1 khay 10 phôi nấm, chăm sóc tự động IoT & thu hoạch 2-3 đợt.',
-    ),
-    RentalPackage(
-      id: 'PKG-02',
-      name: 'Gói Nấm Linh Chi Đỏ Cao Cấp',
-      mushroomType: 'Nấm Linh Chi Đỏ',
-      durationDays: 60,
-      price: 750000,
-      description: 'Kiểm soát vi khí hậu 24/7, theo dõi qua camera trực tiếp & đóng gói dược liệu.',
-    ),
-    RentalPackage(
-      id: 'PKG-03',
-      name: 'Gói Nấm Mối Đen Công Nghệ Cao',
-      mushroomType: 'Nấm Mối Đen',
-      durationDays: 45,
-      price: 620000,
-      description: 'Giám sát CO₂ và độ ẩm chính xác cao, cam kết sản lượng thu hoạch.',
-    ),
-  ];
+  bool _loading = true;
+  String? _error;
+  Map<String, dynamic>? _user;
+  Map<String, dynamic>? _sensors;
+  List<dynamic> _packages = [];
+  List<dynamic> _trays = [];
+  List<dynamic> _rentals = [];
+  List<dynamic> _alerts = [];
 
-  final List<CustomerTray> _myTrays = [
-    CustomerTray(
-      trayCode: 'TRAY-A102',
-      mushroomType: 'Nấm Bào Ngư Xám',
-      roomName: 'Phòng Nuôi Khu A - Tầng 1',
-      growthStage: 'Đang ra quả thể (Sắp thu hoạch)',
-      progressPercent: 80,
-      expectedHarvestDate: '24/11/2026',
-      temperature: 26.5,
-      humidity: 88.0,
-      co2Level: 650,
-    ),
-    CustomerTray(
-      trayCode: 'TRAY-B205',
-      mushroomType: 'Nấm Linh Chi Đỏ',
-      roomName: 'Phòng Nuôi Khu B - Tầng 2',
-      growthStage: 'Ươm tơ giai đoạn 2',
-      progressPercent: 45,
-      expectedHarvestDate: '15/12/2026',
-      temperature: 27.2,
-      humidity: 82.5,
-      co2Level: 720,
-    ),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadAll();
+  }
 
-final _rentalHistory = [
-    {
-      'orderId': 'ORD-20261025',
-      'package': 'Gói Nấm Bào Ngư Xám (Khay TRAY-A102)',
-      'date': '25/10/2026',
-      'amount': '350.000 VNĐ',
-      'status': 'Đang nuôi trồng',
-    },
-    {
-      'orderId': 'ORD-20261015',
-      'package': 'Gói Nấm Linh Chi Đỏ (Khay TRAY-B205)',
-      'date': '15/10/2026',
-      'amount': '750.000 VNĐ',
-      'status': 'Đang nuôi trồng',
-    },
-    {
-      'orderId': 'ORD-20260901',
-      'package': 'Gói Nấm Bào Ngư Xám (Khay TRAY-A098)',
-      'date': '01/09/2026',
-      'amount': '350.000 VNĐ',
-      'status': 'Đã thu hoạch xong',
-    },
-  ];
+  Future<void> _loadAll() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final results = await Future.wait([
+        _api.me(),
+        _api.packages(),
+        _api.myTrays(),
+        _api.rentals(),
+        _api.latestSensors(),
+        _api.alerts(),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _user = results[0] as Map<String, dynamic>;
+        _packages = results[1] as List<dynamic>;
+        _trays = results[2] as List<dynamic>;
+        _rentals = results[3] as List<dynamic>;
+        _sensors = results[4] as Map<String, dynamic>;
+        _alerts = results[5] as List<dynamic>;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString().replaceFirst('Exception: ', '');
+      });
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
 
-  void _showLinkTrayDialog() {
-    final codeController = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Liên kết mã khay mới'),
-        content: TextField(
-          controller: codeController,
-          decoration: const InputDecoration(
-            labelText: 'Nhập mã định danh khay (VD: TRAY-C301)',
-            border: OutlineInputBorder(),
-          ),
+  Future<void> _rentPackage(Map<String, dynamic> pkg) async {
+    try {
+      final pkgId = (pkg['id'] as num).toInt();
+      final res = await _api.createRental(packageId: pkgId, quantity: 1);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Đã gửi yêu cầu thuê #${res['id']} cho ${pkg['name']}!'),
+          backgroundColor: Colors.green.shade700,
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
-          ElevatedButton(
-            onPressed: () {
-              if (codeController.text.trim().isNotEmpty) {
-                setState(() {
-                  _myTrays.add(
-                    CustomerTray(
-                      trayCode: codeController.text.trim().toUpperCase(),
-                      mushroomType: 'Nấm Bào Ngư Xám',
-                      roomName: 'Phòng Nuôi Khu C',
-                      growthStage: 'Mới khởi tạo',
-                      progressPercent: 10,
-                      expectedHarvestDate: '20/12/2026',
-                      temperature: 26.0,
-                      humidity: 85.0,
-                      co2Level: 600,
-                    ),
-                  );
-                });
-                Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Liên kết khay thành công!')),
-                );
-              }
-            },
-            child: const Text('Xác nhận'),
-          ),
-        ],
-      ),
+      );
+      await _loadAll();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceFirst('Exception: ', '')),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+    }
+  }
+
+  Future<void> _logout() async {
+    await _api.logout();
+    if (!mounted) return;
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final pages = [
-      _buildPackagesTab(),
-      _buildMyTraysTab(),
-      _buildProfileTab(),
+    final titles = [
+      'Gói thuê & Đăng ký',
+      'Khay nấm của tôi',
+      'Hợp đồng & Cảnh báo',
+      'Tài khoản',
     ];
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Smart Mushroom Farm'),
+        title: Text(titles[_selectedIndex]),
         backgroundColor: const Color(0xFF2E7D32),
         foregroundColor: Colors.white,
         actions: [
-          if (_selectedIndex == 1)
-            IconButton(
-              icon: const Icon(Icons.qr_code_scanner),
-              tooltip: 'Liên kết mã khay',
-              onPressed: _showLinkTrayDialog,
-            ),
+          IconButton(
+            onPressed: _loadAll,
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Làm mới',
+          ),
         ],
       ),
-      body: pages[_selectedIndex],
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(_error!, textAlign: TextAlign.center),
+                        const SizedBox(height: 12),
+                        ElevatedButton(onPressed: _loadAll, child: const Text('Thử lại')),
+                      ],
+                    ),
+                  ),
+                )
+              : RefreshIndicator(
+                  onRefresh: _loadAll,
+                  child: _buildBody(),
+                ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
         onDestinationSelected: (idx) => setState(() => _selectedIndex = idx),
         destinations: const [
-          NavigationDestination(icon: Icon(Icons.storefront), label: 'Gói thuê'),
-          NavigationDestination(icon: Icon(Icons.grass), label: 'Khay của tôi'),
-          NavigationDestination(icon: Icon(Icons.person), label: 'Tài khoản'),
+          NavigationDestination(icon: Icon(Icons.storefront_outlined), label: 'Gói thuê'),
+          NavigationDestination(icon: Icon(Icons.eco_outlined), label: 'Khay nấm'),
+          NavigationDestination(icon: Icon(Icons.receipt_long_outlined), label: 'Hợp đồng'),
+          NavigationDestination(icon: Icon(Icons.person_outline), label: 'Tài khoản'),
         ],
       ),
     );
   }
 
+  Widget _buildBody() {
+    switch (_selectedIndex) {
+      case 0:
+        return _buildPackagesTab();
+      case 1:
+        return _buildTraysTab();
+      case 2:
+        return _buildRentalsAndAlertsTab();
+      case 3:
+        return _buildProfileTab();
+      default:
+        return const SizedBox.shrink();
+    }
+  }
+
   Widget _buildPackagesTab() {
+    if (_packages.isEmpty) {
+      return const Center(child: Text('Chưa có gói thuê nào đang áp dụng.'));
+    }
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: _packages.length,
-      itemBuilder: (context, index) {
-        final pkg = _packages[index];
+      itemBuilder: (context, i) {
+        final pkg = Map<String, dynamic>.from(_packages[i] as Map);
         return Card(
-          margin: const EdgeInsets.only(bottom: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          margin: const EdgeInsets.only(bottom: 12),
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        pkg.name,
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                    Chip(
-                      label: Text('${pkg.durationDays} ngày'),
-                      backgroundColor: Colors.green[50],
-                    ),
-                  ],
+                Text(
+                  '${pkg['name'] ?? ''}',
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
-                const SizedBox(height: 8),
-                Text(pkg.description, style: TextStyle(color: Colors.grey[700])),
+                const SizedBox(height: 4),
+                Text(
+                  '${pkg['price'] ?? 0} VNĐ • ${pkg['duration_days'] ?? 30} ngày',
+                  style: const TextStyle(color: Color(0xFF2E7D32), fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 6),
+                Text('${pkg['description'] ?? ''}'),
                 const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      '${pkg.price.toStringAsFixed(0)} VNĐ',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF2E7D32),
-                      ),
-                    ),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF2E7D32),
-                        foregroundColor: Colors.white,
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          _rentalHistory.insert(0, {
-                            'orderId': 'ORD-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
-                            'package': pkg.name,
-                            'date': 'Hôm nay',
-                            'amount': '${pkg.price.toStringAsFixed(0)} VNĐ',
-                            'status': 'Chờ xác nhận thanh toán',
-                          });
-                        });
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Đã đặt thuê & lưu vào lịch sử giao dịch: ${pkg.name}')),
-                        );
-                      },
-                      child: const Text('Thuê ngay'),
-                    ),
-                  ],
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: ElevatedButton(
+                    onPressed: () => _rentPackage(pkg),
+                    child: const Text('Đăng ký thuê'),
+                  ),
                 ),
               ],
             ),
@@ -244,34 +207,39 @@ final _rentalHistory = [
     );
   }
 
-  Widget _buildMyTraysTab() {
+  Widget _buildTraysTab() {
+    if (_trays.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: Text('Bạn chưa có khay nấm nào đang kích hoạt.'),
+        ),
+      );
+    }
+    final temp = _sensors?['temperature']?['value'];
+    final hum = _sensors?['humidity']?['value'];
+    final co2 = _sensors?['co2']?['value'];
+
     return ListView.builder(
       padding: const EdgeInsets.all(16),
-      itemCount: _myTrays.length,
-      itemBuilder: (context, index) {
-        final tray = _myTrays[index];
+      itemCount: _trays.length,
+      itemBuilder: (context, i) {
+        final tray = Map<String, dynamic>.from(_trays[i] as Map);
         return Card(
-          margin: const EdgeInsets.only(bottom: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          margin: const EdgeInsets.only(bottom: 12),
           child: ListTile(
-            contentPadding: const EdgeInsets.all(16),
-            leading: CircleAvatar(
-              backgroundColor: Colors.green[100],
-              child: const Icon(Icons.eco, color: Color(0xFF2E7D32)),
+            title: Text('${tray['code']} — ${tray['mushroom_variety'] ?? 'Nấm'}'),
+            subtitle: Text(
+              '${tray['room_name'] ?? ''} • Giai đoạn: ${tray['growth_stage'] ?? ''}\n'
+              'Nhiệt độ: ${temp ?? '--'}°C | Độ ẩm: ${hum ?? '--'}% | CO₂: ${co2 ?? '--'} ppm',
             ),
-            title: Text('${tray.trayCode} • ${tray.mushroomType}',
-                style: const TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: Text(
-                '${tray.growthStage}\nNhiệt độ: ${tray.temperature}°C | Độ ẩm: ${tray.humidity}%',
-              ),
-            ),
-            trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+            trailing: const Icon(Icons.chevron_right),
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => TrayDetailScreen(tray: tray)),
+                MaterialPageRoute(
+                  builder: (_) => TrayDetailScreen(tray: tray, sensors: _sensors),
+                ),
               );
             },
           ),
@@ -280,56 +248,68 @@ final _rentalHistory = [
     );
   }
 
-  Widget _buildProfileTab() {
+  Widget _buildRentalsAndAlertsTab() {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        const ListTile(
-          leading: CircleAvatar(radius: 26, child: Icon(Icons.person, size: 30)),
-          title: Text('Khách hàng Demo', style: TextStyle(fontWeight: FontWeight.bold)),
-          subtitle: Text('customer@mushroom.local'),
-        ),
-        const Divider(),
-        const ListTile(
-          leading: Icon(Icons.notifications_active, color: Colors.orange),
-          title: Text('Thông báo cảnh báo môi trường'),
-          subtitle: Text('Khay TRAY-A102: Độ ẩm đạt chuẩn 88%, sẵn sàng thu hoạch.'),
-        ),
-        const Divider(),
-        const Padding(
-          padding: EdgeInsets.symmetric(vertical: 8),
-          child: Text(
-            'Lịch sử thuê & Giao dịch',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-          ),
-        ),
-        ..._rentalHistory.map(
-          (item) => Card(
-            margin: const EdgeInsets.only(bottom: 10),
-            child: ListTile(
-              leading: const Icon(Icons.receipt_long, color: Color(0xFF2E7D32)),
-              title: Text(item['package']!, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-              subtitle: Text('Mã đơn: ${item['orderId']} • Ngày: ${item['date']}\nTrạng thái: ${item['status']}'),
-              trailing: Text(
-                item['amount']!,
-                style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF2E7D32)),
+        const Text('Hợp đồng thuê', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+        if (_rentals.isEmpty)
+          const Text('Chưa có hợp đồng thuê nào.')
+        else
+          ..._rentals.map((r) {
+            final item = Map<String, dynamic>.from(r as Map);
+            return Card(
+              child: ListTile(
+                title: Text('#${item['id']} — ${item['package_name'] ?? ''}'),
+                subtitle: Text('Trạng thái: ${item['status']} • SL: ${item['quantity']}'),
               ),
-              isThreeLine: true,
+            );
+          }),
+        const SizedBox(height: 20),
+        const Text('Cảnh báo môi trường', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+        if (_alerts.isEmpty)
+          const Text('Chưa có cảnh báo nào.')
+        else
+          ..._alerts.map((a) {
+            final item = Map<String, dynamic>.from(a as Map);
+            return Card(
+              child: ListTile(
+                leading: const Icon(Icons.notifications_active, color: Colors.amber),
+                title: Text('${item['title'] ?? ''}'),
+                subtitle: Text('${item['message'] ?? ''}'),
+              ),
+            );
+          }),
+      ],
+    );
+  }
+
+  Widget _buildProfileTab() {
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '${_user?['full_name'] ?? _user?['name'] ?? 'Người dùng'}',
+            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 6),
+          Text('Email: ${_user?['email'] ?? ''}'),
+          Text('Vai trò: ${_user?['role'] ?? ''}'),
+          Text('Trạng thái: ${_user?['status'] ?? ''}'),
+          const Spacer(),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.tonal(
+              onPressed: _logout,
+              child: const Text('Đăng xuất'),
             ),
           ),
-        ),
-        const Divider(),
-        ListTile(
-          leading: const Icon(Icons.logout, color: Colors.red),
-          title: const Text('Đăng xuất', style: TextStyle(color: Colors.red)),
-          onTap: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (_) => const LoginScreen()),
-            );
-          },
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

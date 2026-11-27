@@ -1,583 +1,328 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useState } from 'react';
+import api, { saveAuthSession } from '../../services/api';
 
-const generateOtpCode = () =>
-  String(Math.floor(100000 + Math.random() * 900000));
+const SHOW_DEMO_ACCOUNTS = import.meta.env.DEV;
+
+const DEMO_ACCOUNTS = [
+  {
+    role: 'Admin',
+    email: 'admin@mushroom.local',
+    password: 'Admin@123456',
+    badgeClass: 'bg-purple-100 text-purple-700',
+  },
+  {
+    role: 'Operator',
+    email: 'operator@mushroom.local',
+    password: 'Operator@123456',
+    badgeClass: 'bg-blue-100 text-blue-700',
+  },
+  {
+    role: 'Customer',
+    email: 'customer@mushroom.local',
+    password: 'Customer@123456',
+    badgeClass: 'bg-emerald-100 text-emerald-700',
+  },
+];
 
 export default function AuthPage({
-  accounts = [],
   onLoginSuccess,
-  onRegisterCustomer,
-  onBackToWorkspace,
+  initialNotice = '',
 }) {
   const [mode, setMode] = useState('login'); // 'login' | 'register'
-  const [registerStep, setRegisterStep] = useState('form'); // 'form' | 'otp'
-
-  // State đăng nhập
-  const [identifier, setIdentifier] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [loginError, setLoginError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
-  // State đăng ký khách hàng + OTP
   const [fullName, setFullName] = useState('');
-  const [contactChannel, setContactChannel] = useState('email'); // 'email' | 'phone'
-  const [contactValue, setContactValue] = useState('');
+  const [regEmail, setRegEmail] = useState('');
   const [regPassword, setRegPassword] = useState('');
-  const [otpCode, setOtpCode] = useState('');
-  const [expectedOtp, setExpectedOtp] = useState('');
-  const [otpInput, setOtpInput] = useState('');
-  const [resendCooldown, setResendCooldown] = useState(0);
-  const [registerError, setRegisterError] = useState('');
-  const [registerInfo, setRegisterInfo] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
 
-  useEffect(() => {
-    if (resendCooldown <= 0) return;
-    const timer = setInterval(() => {
-      setResendCooldown((prev) => (prev > 0 ? prev - 1 : 0));
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [resendCooldown]);
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+  const [infoMsg, setInfoMsg] = useState(initialNotice);
 
-  const quickFillAccounts = useMemo(() => {
-    const activeAdmin = accounts.find(
-      (acc) => acc.role === 'Admin' && acc.status === 'Hoạt động'
-    );
-    const activeOperator = accounts.find(
-      (acc) => acc.role === 'Operator' && acc.status === 'Hoạt động'
-    );
-    const inactiveAccount = accounts.find(
-      (acc) => acc.status !== 'Hoạt động'
-    );
-    const customerAccount = accounts.find((acc) => acc.role === 'Customer');
-
-    return [
-      activeAdmin && {
-        ...activeAdmin,
-        quickLabel: `Admin: ${activeAdmin.fullName}`,
-      },
-      activeOperator && {
-        ...activeOperator,
-        quickLabel: `Operator: ${activeOperator.fullName}`,
-      },
-      inactiveAccount && {
-        ...inactiveAccount,
-        quickLabel: `Khóa: ${inactiveAccount.fullName}`,
-      },
-      customerAccount && {
-        ...customerAccount,
-        quickLabel: `Customer: ${customerAccount.fullName}`,
-      },
-    ].filter(Boolean);
-  }, [accounts]);
-
-  const handleQuickFill = (account) => {
-    setIdentifier(account.email || account.phone || '');
-    setPassword(account.password || '123456');
-    setLoginError('');
+  const handleSelectDemo = (acc) => {
+    setEmail(acc.email);
+    setPassword(acc.password);
+    setErrorMsg('');
+    setInfoMsg(`Đã điền thông tin tài khoản ${acc.role}. Bấm "Đăng nhập" để tiếp tục.`);
   };
 
-  const handleLoginSubmit = (e) => {
+  const handleLoginSubmit = async (e) => {
     e.preventDefault();
-    const cleanId = identifier.trim().toLowerCase();
-    const cleanPass = password.trim();
+    const cleanEmail = email.trim();
+    const cleanPass = password;
 
-    if (!cleanId || !cleanPass) {
-      setLoginError('Vui lòng nhập email/số điện thoại và mật khẩu.');
+    if (!cleanEmail || !cleanPass) {
+      setErrorMsg('Vui lòng nhập đầy đủ email và mật khẩu.');
       return;
     }
 
-    const matched = accounts.find((acc) => {
-      const matchEmail =
-        acc.email && acc.email.trim().toLowerCase() === cleanId;
-      const matchPhone =
-        acc.phone && acc.phone.trim().toLowerCase() === cleanId;
-      const matchName =
-        acc.fullName && acc.fullName.trim().toLowerCase() === cleanId;
-      return matchEmail || matchPhone || matchName;
-    });
-
-    if (!matched) {
-      setLoginError(
-        'Không tìm thấy tài khoản phù hợp. Kiểm tra lại thông tin hoặc chọn tài khoản mẫu bên dưới.'
-      );
-      return;
+    setLoading(true);
+    setErrorMsg('');
+    setInfoMsg('');
+    try {
+      const data = await api.auth.login(cleanEmail, cleanPass);
+      saveAuthSession(data);
+      onLoginSuccess(data.user);
+    } catch (err) {
+      setErrorMsg(err.message || 'Đăng nhập thất bại.');
+    } finally {
+      setLoading(false);
     }
-
-    if (matched.status !== 'Hoạt động') {
-      setLoginError(
-        `Tài khoản "${matched.fullName}" đang ở trạng thái "${matched.status}" nên không thể đăng nhập.`
-      );
-      return;
-    }
-
-    const expectedPass = matched.password || '123456';
-    if (cleanPass !== expectedPass) {
-      setLoginError('Mật khẩu chưa chính xác (mật khẩu mẫu mặc định: 123456).');
-      return;
-    }
-
-    setLoginError('');
-    onLoginSuccess(matched);
   };
 
-  const handleSendOtp = (e) => {
+  const handleRegisterSubmit = async (e) => {
     e.preventDefault();
-    const cleanName = fullName.trim();
-    const cleanContact = contactValue.trim();
-    const cleanPass = regPassword.trim();
-
-    if (!cleanName || !cleanContact || !cleanPass) {
-      setRegisterError(
-        'Vui lòng nhập đầy đủ họ tên, email/số điện thoại và mật khẩu.'
-      );
+    if (!fullName.trim() || !regEmail.trim() || !regPassword) {
+      setErrorMsg('Vui lòng điền đầy đủ họ tên, email và mật khẩu.');
+      return;
+    }
+    if (regPassword.length < 6) {
+      setErrorMsg('Mật khẩu phải có ít nhất 6 ký tự.');
+      return;
+    }
+    if (regPassword !== confirmPassword) {
+      setErrorMsg('Mật khẩu xác nhận không khớp.');
       return;
     }
 
-    if (contactChannel === 'email' && !cleanContact.includes('@')) {
-      setRegisterError('Vui lòng nhập địa chỉ email hợp lệ.');
-      return;
+    setLoading(true);
+    setErrorMsg('');
+    setInfoMsg('');
+    try {
+      await api.auth.register(fullName.trim(), regEmail.trim(), regPassword);
+      const loginRes = await api.auth.login(regEmail.trim(), regPassword);
+      saveAuthSession(loginRes);
+      onLoginSuccess(loginRes.user);
+    } catch (err) {
+      setErrorMsg(err.message || 'Đăng ký tài khoản thất bại.');
+    } finally {
+      setLoading(false);
     }
-
-    if (contactChannel === 'phone') {
-      const digitsOnly = cleanContact.replace(/\D/g, '');
-      if (digitsOnly.length < 9) {
-        setRegisterError('Vui lòng nhập số điện thoại hợp lệ (ít nhất 9 số).');
-        return;
-      }
-    }
-
-    if (cleanPass.length < 6) {
-      setRegisterError('Mật khẩu cần tối thiểu 6 ký tự.');
-      return;
-    }
-
-    const duplicated = accounts.some((acc) => {
-      const target = cleanContact.toLowerCase();
-      return (
-        (acc.email && acc.email.trim().toLowerCase() === target) ||
-        (acc.phone && acc.phone.trim().toLowerCase() === target)
-      );
-    });
-
-    if (duplicated) {
-      setRegisterError(
-        'Email hoặc số điện thoại này đã được đăng ký trong hệ thống.'
-      );
-      return;
-    }
-
-    const code = generateOtpCode();
-    setExpectedOtp(code);
-    setOtpCode(code);
-    setOtpInput('');
-    setRegisterStep('otp');
-    setRegisterError('');
-    setResendCooldown(30);
-    setRegisterInfo(
-      `Đã gửi mã OTP xác thực tới ${
-        contactChannel === 'email' ? 'email' : 'số điện thoại'
-      } "${cleanContact}".`
-    );
-  };
-
-  const handleResendOtp = () => {
-    if (resendCooldown > 0) return;
-    const code = generateOtpCode();
-    setExpectedOtp(code);
-    setOtpCode(code);
-    setOtpInput('');
-    setResendCooldown(30);
-    setRegisterError('');
-    setRegisterInfo(`Đã gửi lại mã OTP mới tới "${contactValue.trim()}".`);
-  };
-
-  const handleVerifyOtp = (e) => {
-    e.preventDefault();
-    if (otpInput.trim() !== expectedOtp) {
-      setRegisterError('Mã OTP không đúng. Vui lòng kiểm tra lại mã xác thực.');
-      return;
-    }
-
-    const cleanContact = contactValue.trim();
-    const newCustomer = {
-      id: `USR-${Date.now().toString().slice(-4)}`,
-      fullName: fullName.trim(),
-      email: contactChannel === 'email' ? cleanContact : '',
-      phone: contactChannel === 'phone' ? cleanContact : '',
-      password: regPassword.trim(),
-      role: 'Customer',
-      accountType: 'Khách hàng',
-      status: 'Hoạt động',
-      verifiedOtp: true,
-    };
-
-    setRegisterError('');
-    onRegisterCustomer(newCustomer);
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
-      <div className="w-full max-w-4xl bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden grid grid-cols-1 lg:grid-cols-12">
-        {/* CỘT TRÁI: GIỚI THIỆU KIẾN TRÚC PHÂN LUỒNG */}
-        <div className="lg:col-span-5 bg-slate-900 text-white p-6 flex flex-col justify-between space-y-6">
-          <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              <span className="text-2xl">🍄</span>
-              <div>
-                <h1 className="text-lg font-bold tracking-tight">
-                  MUSHROOM IOT
-                </h1>
-                <p className="text-xs text-slate-400">
-                  Hệ thống quản lý nuôi trồng nấm thông minh
-                </p>
-              </div>
-            </div>
-
-            <div className="bg-slate-800/80 border border-slate-700 rounded-xl p-4 space-y-2.5 text-xs text-slate-300">
-              <p className="font-semibold text-emerald-400">
-                Phân luồng tài khoản rõ ràng
-              </p>
-              <p>
-                • <strong>Nhân viên (Admin / Operator):</strong> Do Admin cấp
-                quyền trong mục Quản lý tài khoản, không tự đăng ký công khai.
-              </p>
-              <p>
-                • <strong>Khách hàng (Customer):</strong> Tự đăng ký bằng Email
-                hoặc SĐT, kích hoạt tài khoản qua mã OTP và thao tác trong cổng
-                thuê khay riêng.
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-950 flex items-center justify-center p-4">
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+        <div className="bg-slate-900 px-6 py-6 text-white">
+          <div className="flex items-center gap-3">
+            <span className="text-3xl">🍄</span>
+            <div>
+              <h1 className="text-lg font-bold tracking-wide">
+                MUSHROOM IOT SMART FARM
+              </h1>
+              <p className="text-xs text-slate-300">
+                Hệ thống quản lý trồng nấm thông minh (Spring Boot + PostgreSQL)
               </p>
             </div>
           </div>
-
-          {onBackToWorkspace && (
-            <button
-              type="button"
-              onClick={onBackToWorkspace}
-              className="w-full py-2.5 px-4 rounded-xl text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition cursor-pointer"
-            >
-              ← Quay lại khu vực vận hành demo
-            </button>
-          )}
         </div>
 
-        {/* CỘT PHẢI: FORM ĐĂNG NHẬP / ĐĂNG KÝ + OTP */}
-        <div className="lg:col-span-7 p-6 sm:p-8 space-y-5">
-          <div className="flex rounded-xl bg-slate-100 p-1">
+        <div className="p-5 sm:p-6">
+          <div className="flex rounded-xl bg-slate-100 p-1 mb-5">
             <button
               type="button"
               onClick={() => {
                 setMode('login');
-                setLoginError('');
+                setErrorMsg('');
               }}
-              className={`flex-1 py-2 text-xs font-semibold rounded-lg transition cursor-pointer ${
+              className={`flex-1 py-2 text-sm font-medium rounded-lg transition cursor-pointer ${
                 mode === 'login'
                   ? 'bg-white text-slate-900 shadow-sm'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              Đăng nhập hệ thống
+              Đăng nhập
             </button>
             <button
               type="button"
               onClick={() => {
                 setMode('register');
-                setRegisterError('');
+                setErrorMsg('');
               }}
-              className={`flex-1 py-2 text-xs font-semibold rounded-lg transition cursor-pointer ${
+              className={`flex-1 py-2 text-sm font-medium rounded-lg transition cursor-pointer ${
                 mode === 'register'
                   ? 'bg-white text-slate-900 shadow-sm'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              Đăng ký Khách hàng (OTP)
+              Đăng ký Khách hàng
             </button>
           </div>
 
+          {infoMsg && (
+            <div className="mb-4 rounded-lg bg-amber-50 border border-amber-200 px-3.5 py-2.5 text-xs text-amber-800">
+              {infoMsg}
+            </div>
+          )}
+
+          {errorMsg && (
+            <div className="mb-4 rounded-lg bg-red-50 border border-red-200 px-3.5 py-2.5 text-xs text-red-700">
+              {errorMsg}
+            </div>
+          )}
+
           {mode === 'login' ? (
-            <div className="space-y-4">
+            <form onSubmit={handleLoginSubmit} className="space-y-4">
               <div>
-                <h2 className="text-lg font-semibold text-gray-800">
-                  Đăng nhập tài khoản
-                </h2>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  Hỗ trợ đăng nhập cho Admin, Operator và Khách hàng (mật khẩu
-                  mẫu: <code className="font-semibold">123456</code>)
-                </p>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Email tài khoản
+                </label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="admin@mushroom.local"
+                  className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  required
+                />
               </div>
 
-              <form onSubmit={handleLoginSubmit} className="space-y-3.5">
-                <div>
-                  <label className="block text-xs text-gray-600 mb-1">
-                    Email hoặc Số điện thoại *
-                  </label>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Mật khẩu
+                </label>
+                <div className="relative">
                   <input
-                    type="text"
-                    value={identifier}
-                    onChange={(e) => {
-                      setIdentifier(e.target.value);
-                      if (loginError) setLoginError('');
-                    }}
-                    placeholder="VD: admin@mushroom.vn hoặc 0901234567"
-                    className="w-full border border-gray-200 rounded-lg px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs text-gray-600 mb-1">
-                    Mật khẩu *
-                  </label>
-                  <input
-                    type="password"
+                    type={showPassword ? 'text' : 'password'}
                     value={password}
-                    onChange={(e) => {
-                      setPassword(e.target.value);
-                      if (loginError) setLoginError('');
-                    }}
-                    placeholder="Nhập mật khẩu (mặc định: 123456)"
-                    className="w-full border border-gray-200 rounded-lg px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Nhập mật khẩu"
+                    className="w-full pl-3.5 pr-14 py-2.5 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    required
                   />
-                </div>
-
-                {loginError && (
-                  <div className="bg-red-50 border border-red-200 rounded-lg px-3.5 py-2.5">
-                    <p className="text-xs text-red-700 font-medium">
-                      {loginError}
-                    </p>
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  className="w-full py-2.5 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium transition cursor-pointer"
-                >
-                  Đăng nhập
-                </button>
-              </form>
-
-              {/* TÀI KHOẢN MẪU ĐỂ TEST NHANH */}
-              <div className="pt-3 border-t border-gray-100 space-y-2">
-                <p className="text-xs font-medium text-gray-500">
-                  Điền nhanh tài khoản mẫu để test:
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {quickFillAccounts.map((acc) => (
-                    <button
-                      key={acc.id}
-                      type="button"
-                      onClick={() => handleQuickFill(acc)}
-                      className="text-xs px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer"
-                    >
-                      {acc.quickLabel}
-                    </button>
-                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiển thị mật khẩu'}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-500 hover:text-slate-800 px-1.5 py-1 rounded cursor-pointer"
+                  >
+                    {showPassword ? 'Ẩn' : 'Hiện'}
+                  </button>
                 </div>
               </div>
-            </div>
-          ) : registerStep === 'form' ? (
-            <div className="space-y-4">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-800">
-                  Đăng ký tài khoản Khách thuê
-                </h2>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  Nhập thông tin cơ bản và chọn nhận mã OTP qua Email hoặc Số
-                  điện thoại
-                </p>
-              </div>
 
-              <form onSubmit={handleSendOtp} className="space-y-3.5">
-                <div>
-                  <label className="block text-xs text-gray-600 mb-1">
-                    Họ và tên *
-                  </label>
-                  <input
-                    type="text"
-                    value={fullName}
-                    onChange={(e) => {
-                      setFullName(e.target.value);
-                      if (registerError) setRegisterError('');
-                    }}
-                    placeholder="VD: Trần Minh Khoa"
-                    className="w-full border border-gray-200 rounded-lg px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
-                  />
-                </div>
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-semibold text-sm transition cursor-pointer"
+              >
+                {loading ? 'Đang xác thực...' : 'Đăng nhập'}
+              </button>
 
-                <div>
-                  <label className="block text-xs text-gray-600 mb-1">
-                    Kênh nhận mã OTP *
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setContactChannel('email');
-                        setContactValue('');
-                        setRegisterError('');
-                      }}
-                      className={`py-2 px-3 rounded-lg text-xs font-medium border transition cursor-pointer ${
-                        contactChannel === 'email'
-                          ? 'bg-emerald-50 border-emerald-400 text-emerald-800'
-                          : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
-                      }`}
-                    >
-                      Đăng ký qua Email
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setContactChannel('phone');
-                        setContactValue('');
-                        setRegisterError('');
-                      }}
-                      className={`py-2 px-3 rounded-lg text-xs font-medium border transition cursor-pointer ${
-                        contactChannel === 'phone'
-                          ? 'bg-emerald-50 border-emerald-400 text-emerald-800'
-                          : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
-                      }`}
-                    >
-                      Đăng ký qua Số điện thoại
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs text-gray-600 mb-1">
-                    {contactChannel === 'email'
-                      ? 'Địa chỉ Email *'
-                      : 'Số điện thoại *'}
-                  </label>
-                  <input
-                    type={contactChannel === 'email' ? 'email' : 'tel'}
-                    value={contactValue}
-                    onChange={(e) => {
-                      setContactValue(e.target.value);
-                      if (registerError) setRegisterError('');
-                    }}
-                    placeholder={
-                      contactChannel === 'email'
-                        ? 'VD: minh.khoa@gmail.com'
-                        : 'VD: 0912345678'
-                    }
-                    className="w-full border border-gray-200 rounded-lg px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs text-gray-600 mb-1">
-                    Mật khẩu (ít nhất 6 ký tự) *
-                  </label>
-                  <input
-                    type="password"
-                    value={regPassword}
-                    onChange={(e) => {
-                      setRegPassword(e.target.value);
-                      if (registerError) setRegisterError('');
-                    }}
-                    placeholder="Nhập mật khẩu tài khoản"
-                    className="w-full border border-gray-200 rounded-lg px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
-                  />
-                </div>
-
-                {registerError && (
-                  <div className="bg-red-50 border border-red-200 rounded-lg px-3.5 py-2.5">
-                    <p className="text-xs text-red-700 font-medium">
-                      {registerError}
+              {SHOW_DEMO_ACCOUNTS && (
+                <div className="pt-3 border-t border-slate-100">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs font-semibold text-slate-700">
+                      Tài khoản đăng nhập nhanh
                     </p>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">
+                      DEV ONLY
+                    </span>
                   </div>
-                )}
-
-                <button
-                  type="submit"
-                  className="w-full py-2.5 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium transition cursor-pointer"
-                >
-                  Gửi mã OTP xác thực
-                </button>
-              </form>
-            </div>
+                  <div className="space-y-1.5">
+                    {DEMO_ACCOUNTS.map((acc) => {
+                      const isSelected =
+                        email === acc.email && password === acc.password;
+                      return (
+                        <button
+                          key={acc.email}
+                          type="button"
+                          onClick={() => handleSelectDemo(acc)}
+                          className={`w-full text-left px-3 py-2 rounded-lg border text-xs transition cursor-pointer flex flex-wrap items-center justify-between gap-1.5 ${
+                            isSelected
+                              ? 'border-emerald-500 bg-emerald-50/70'
+                              : 'border-slate-200 bg-slate-50 hover:bg-slate-100'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span
+                              className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${acc.badgeClass}`}
+                            >
+                              {acc.role}
+                            </span>
+                            <span className="font-medium text-slate-800 truncate">
+                              {acc.email}
+                            </span>
+                          </div>
+                          <span className="font-mono text-[11px] text-slate-600">
+                            {acc.password}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </form>
           ) : (
-            <div className="space-y-4">
+            <form onSubmit={handleRegisterSubmit} className="space-y-4">
               <div>
-                <h2 className="text-lg font-semibold text-gray-800">
-                  Xác thực mã OTP
-                </h2>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  {registerInfo}
-                </p>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Họ và tên
+                </label>
+                <input
+                  type="text"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="Nguyễn Văn A"
+                  className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  required
+                />
               </div>
 
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3.5 flex items-center justify-between gap-3">
-                <div className="text-xs text-amber-900">
-                  <p className="font-semibold">Mã OTP mô phỏng (chế độ test):</p>
-                  <p className="text-amber-700 mt-0.5">
-                    Khi nối Backend thật, mã sẽ được gửi qua Email/SMS service.
-                  </p>
-                </div>
-                <span className="text-base font-bold tracking-widest bg-white border border-amber-300 text-amber-800 px-3 py-1.5 rounded-lg">
-                  {otpCode}
-                </span>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={regEmail}
+                  onChange={(e) => setRegEmail(e.target.value)}
+                  placeholder="khachhang@example.com"
+                  className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  required
+                />
               </div>
 
-              <form onSubmit={handleVerifyOtp} className="space-y-3.5">
-                <div>
-                  <label className="block text-xs text-gray-600 mb-1">
-                    Nhập mã OTP 6 chữ số *
-                  </label>
-                  <input
-                    type="text"
-                    maxLength={6}
-                    value={otpInput}
-                    onChange={(e) => {
-                      setOtpInput(e.target.value);
-                      if (registerError) setRegisterError('');
-                    }}
-                    placeholder="Nhập mã 6 số"
-                    className="w-full border border-gray-200 rounded-lg px-3.5 py-2.5 text-sm tracking-widest font-semibold outline-none focus:ring-2 focus:ring-emerald-500"
-                  />
-                </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Mật khẩu (tối thiểu 6 ký tự)
+                </label>
+                <input
+                  type="password"
+                  value={regPassword}
+                  onChange={(e) => setRegPassword(e.target.value)}
+                  placeholder="Nhập mật khẩu"
+                  className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  required
+                />
+              </div>
 
-                {registerError && (
-                  <div className="bg-red-50 border border-red-200 rounded-lg px-3.5 py-2.5">
-                    <p className="text-xs text-red-700 font-medium">
-                      {registerError}
-                    </p>
-                  </div>
-                )}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Xác nhận mật khẩu
+                </label>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Nhập lại mật khẩu"
+                  className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  required
+                />
+              </div>
 
-                <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setRegisterStep('form');
-                      setRegisterError('');
-                    }}
-                    className="text-xs px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer"
-                  >
-                    ← Đổi thông tin
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled={resendCooldown > 0}
-                    onClick={handleResendOtp}
-                    className={`text-xs px-3 py-2 rounded-lg font-medium ${
-                      resendCooldown > 0
-                        ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                        : 'bg-blue-50 hover:bg-blue-100 text-blue-700 cursor-pointer'
-                    }`}
-                  >
-                    {resendCooldown > 0
-                      ? `Gửi lại OTP (${resendCooldown}s)`
-                      : 'Gửi lại mã OTP'}
-                  </button>
-                </div>
-
-                <button
-                  type="submit"
-                  className="w-full py-2.5 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium transition cursor-pointer"
-                >
-                  Xác nhận OTP & Kích hoạt tài khoản
-                </button>
-              </form>
-            </div>
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-semibold text-sm transition cursor-pointer"
+              >
+                {loading ? 'Đang đăng ký...' : 'Đăng ký tài khoản Khách hàng'}
+              </button>
+            </form>
           )}
         </div>
       </div>
