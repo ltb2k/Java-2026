@@ -1,9 +1,7 @@
 import React, { useState } from 'react';
 import api, { saveAuthSession } from '../../services/api';
 
-const SHOW_DEMO_ACCOUNTS = import.meta.env.DEV;
-
-const DEMO_ACCOUNTS = [
+const QUICK_LOGIN_ACCOUNTS = [
   {
     role: 'Admin',
     email: 'admin@mushroom.local',
@@ -39,14 +37,32 @@ export default function AuthPage({
   const [confirmPassword, setConfirmPassword] = useState('');
 
   const [loading, setLoading] = useState(false);
+  const [quickLoadingRole, setQuickLoadingRole] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [infoMsg, setInfoMsg] = useState(initialNotice);
 
-  const handleSelectDemo = (acc) => {
+  const performLogin = async (loginEmail, loginPassword, roleLabel = '') => {
+    setLoading(true);
+    setQuickLoadingRole(roleLabel);
+    setErrorMsg('');
+    setInfoMsg('');
+    try {
+      const data = await api.auth.login(loginEmail, loginPassword);
+      saveAuthSession(data);
+      onLoginSuccess(data.user);
+    } catch (err) {
+      setErrorMsg(err.message || 'Đăng nhập thất bại.');
+    } finally {
+      setLoading(false);
+      setQuickLoadingRole('');
+    }
+  };
+
+  const handleQuickLogin = async (acc) => {
+    if (loading) return;
     setEmail(acc.email);
     setPassword(acc.password);
-    setErrorMsg('');
-    setInfoMsg(`Đã điền thông tin tài khoản ${acc.role}. Bấm "Đăng nhập" để tiếp tục.`);
+    await performLogin(acc.email, acc.password, acc.role);
   };
 
   const handleLoginSubmit = async (e) => {
@@ -59,18 +75,7 @@ export default function AuthPage({
       return;
     }
 
-    setLoading(true);
-    setErrorMsg('');
-    setInfoMsg('');
-    try {
-      const data = await api.auth.login(cleanEmail, cleanPass);
-      saveAuthSession(data);
-      onLoginSuccess(data.user);
-    } catch (err) {
-      setErrorMsg(err.message || 'Đăng nhập thất bại.');
-    } finally {
-      setLoading(false);
-    }
+    await performLogin(cleanEmail, cleanPass);
   };
 
   const handleRegisterSubmit = async (e) => {
@@ -209,53 +214,42 @@ export default function AuthPage({
                 disabled={loading}
                 className="w-full py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-semibold text-sm transition cursor-pointer"
               >
-                {loading ? 'Đang xác thực...' : 'Đăng nhập'}
+                {loading && !quickLoadingRole ? 'Đang xác thực...' : 'Đăng nhập'}
               </button>
 
-              {SHOW_DEMO_ACCOUNTS && (
-                <div className="pt-3 border-t border-slate-100">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-xs font-semibold text-slate-700">
-                      Tài khoản đăng nhập nhanh
-                    </p>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">
-                      DEV ONLY
-                    </span>
-                  </div>
-                  <div className="space-y-1.5">
-                    {DEMO_ACCOUNTS.map((acc) => {
-                      const isSelected =
-                        email === acc.email && password === acc.password;
-                      return (
-                        <button
-                          key={acc.email}
-                          type="button"
-                          onClick={() => handleSelectDemo(acc)}
-                          className={`w-full text-left px-3 py-2 rounded-lg border text-xs transition cursor-pointer flex flex-wrap items-center justify-between gap-1.5 ${
-                            isSelected
-                              ? 'border-emerald-500 bg-emerald-50/70'
-                              : 'border-slate-200 bg-slate-50 hover:bg-slate-100'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span
-                              className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${acc.badgeClass}`}
-                            >
-                              {acc.role}
-                            </span>
-                            <span className="font-medium text-slate-800 truncate">
-                              {acc.email}
-                            </span>
-                          </div>
-                          <span className="font-mono text-[11px] text-slate-600">
-                            {acc.password}
+              <div className="pt-3 border-t border-slate-100">
+                <p className="text-xs font-semibold text-slate-700 mb-2">
+                  Đăng nhập nhanh (1-click)
+                </p>
+                <div className="space-y-1.5">
+                  {QUICK_LOGIN_ACCOUNTS.map((acc) => {
+                    const isBusy = quickLoadingRole === acc.role;
+                    return (
+                      <button
+                        key={acc.email}
+                        type="button"
+                        disabled={loading}
+                        onClick={() => handleQuickLogin(acc)}
+                        className="w-full text-left px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 hover:bg-emerald-50 hover:border-emerald-300 disabled:opacity-60 text-xs transition cursor-pointer flex flex-wrap items-center justify-between gap-1.5"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span
+                            className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${acc.badgeClass}`}
+                          >
+                            {acc.role}
                           </span>
-                        </button>
-                      );
-                    })}
-                  </div>
+                          <span className="font-medium text-slate-800 truncate">
+                            {acc.email}
+                          </span>
+                        </div>
+                        <span className="font-mono text-[11px] text-slate-600">
+                          {isBusy ? 'Đang đăng nhập...' : acc.password}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
-              )}
+              </div>
             </form>
           ) : (
             <form onSubmit={handleRegisterSubmit} className="space-y-4">
