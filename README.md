@@ -1,50 +1,213 @@
-﻿# Java-2026 — Smart Mushroom Cultivation Management System
+﻿# 🍄 Hệ Thống Quản Lý Trồng Nấm Thông Minh — Java-2026
 
-The supported development application is the project at this repository root. `java-rebuild/` is a separate, older rebuild with its own API and database schema; do not combine its files with the root project.
+> **Mushroom IoT Smart Farm Management System**  
+> Backend: **Java 21 + Spring Boot 3.3** | Frontend: **React + Vite** | Mobile: **Flutter** | IoT: **ESP32 + MQTT**
 
-## Stack
-- Backend: Node.js, Express, PostgreSQL, JWT
-- Web admin: React and Vite
-- Mobile: Flutter starter
-- IoT: ESP32 starter
+---
 
-## Windows setup
+## 📁 Cấu Trúc Dự Án
 
-1. Install Node.js 20.19+ or 22.12+, Docker Desktop, and Git if needed.
-2. Start a PowerShell terminal in this repository. If `.env` does not already exist, copy `.env.example` to `.env` with `if (-not (Test-Path .env)) { Copy-Item .env.example .env }`. Edit `.env` locally and set a private `POSTGRES_PASSWORD` before starting Compose. Keep any existing `.env` intact.
-3. Run `docker compose up -d postgres` and wait for `docker compose ps` to show PostgreSQL as healthy. On a newly created database volume, Compose applies `database/schema.sql` and then `database/seed.sql` automatically. Existing volumes are preserved; Docker does not rerun initialization scripts against them. If a volume already exists, keep `POSTGRES_PASSWORD` aligned with that database's existing credentials; changing the Compose variable alone does not reset a database password.
-4. In a second PowerShell terminal, run:
+```
+Java-2026/
+├── backend-java/        ← Spring Boot Java Backend (port 5000)
+│   ├── src/main/java/vn/edu/mushroom/
+│   │   ├── controller/  ← REST Controllers
+│   │   ├── service/     ← Business Logic
+│   │   ├── repository/  ← Spring Data JPA
+│   │   ├── entity/      ← JPA Entities
+│   │   ├── dto/         ← Request/Response DTOs
+│   │   ├── config/      ← Security, JWT, OpenAPI
+│   │   ├── mqtt/        ← MQTT IoT Integration
+│   │   └── exception/   ← Global Exception Handling
+│   ├── pom.xml
+│   ├── Dockerfile
+│   └── docker-compose.yml  ← Backend-only compose
+│
+├── frontend-web/        ← React + Vite Web Admin (port 3000)
+│   ├── src/pages/       ← Dashboard, Rooms, Devices, Harvest...
+│   ├── package.json
+│   └── Dockerfile
+│
+├── mobile/              ← Flutter Mobile App (Customer)
+│   ├── lib/
+│   └── pubspec.yaml
+│
+├── iot/                 ← ESP32 Firmware (Arduino)
+│   └── mushroom_iot/
+│
+├── database/
+│   ├── schema.sql       ← PostgreSQL schema
+│   └── seed.sql         ← Seed data
+│
+├── docs/
+│   └── SRS.md           ← Software Requirements Specification
+│
+└── docker-compose.yml   ← Full-stack compose (all services)
+```
 
-   ```powershell
-   cd backend
-   npm ci
-   if (-not (Test-Path .env)) { Copy-Item .env.example .env }
-   ```
+---
 
-   Edit `backend/.env` locally. Set `DATABASE_URL` to the local PostgreSQL connection matching the Compose database name, user, and password, and set a private random `JWT_SECRET` of at least 32 characters. If using IoT ingestion, also set `IOT_INGEST_KEY` privately and configure devices to send it in the `x-device-key` header. Do not share or commit this file.
-5. Start the backend with `npm run dev`. The API listens on port 5000 and `/api/health` reports database connectivity.
-6. In a third terminal, run:
+## 🚀 Khởi Chạy Nhanh (Docker Compose)
 
-   ```powershell
-   cd web-admin
-   npm ci
-   npm run dev
-   ```
+### Yêu Cầu
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Windows)
+- Git
 
-7. Open the Vite URL, normally `http://localhost:5173`, and register a customer account. New installations have no built-in demo users. To create an administrator, privately set `ADMIN_EMAIL`, `ADMIN_FULL_NAME`, and `ADMIN_PASSWORD` in `backend/.env`, then run `npm run seed:admin` from `backend/` only after confirming the configured database is the intended local database.
+### 1. Clone & Cấu Hình
 
-## Existing databases
+```powershell
+git clone https://github.com/ltb2k/Java-2026.git
+cd Java-2026
 
-The backend checks schema readiness but does not migrate automatically. Before upgrading an existing database, inspect it and make a backup. Run `npm run db:migrate` from `backend/` only after confirming the target is a local development database and resolving any case-insensitive duplicate emails or duplicate active rentals. This migration is additive and does not delete rows.
+# Tạo file .env từ mẫu
+cp backend-java\.env.example .env
+```
 
-`database/migrations/20261011_add_active_rental_constraint.sql` is provided for manual database administration only. It prevents more than one active rental for a tray and is never applied automatically.
+Chỉnh sửa `.env`:
 
-Do not run `docker compose down -v` for a database that contains data: removing the volume deletes that database.
+```env
+POSTGRES_PASSWORD=your_secure_password
+JWT_SECRET=your_very_long_jwt_secret_at_least_64_chars
+MQTT_USERNAME=
+MQTT_PASSWORD=
+```
 
-## Checks
+### 2. Chạy Toàn Bộ Stack
 
-From `backend/`, run `npm test`. From `web-admin/`, run `npm run build`. Full authentication and database integration checks require a local PostgreSQL instance and a privately configured backend environment.
+```powershell
+docker-compose up -d --build
+```
 
-## Internet data and reference media
+Các service sẽ khởi chạy theo thứ tự: **PostgreSQL → Mosquitto MQTT → Backend Java → Frontend**
 
-The project can show authenticated, cached outdoor weather from Open-Meteo, NASA POWER history, and clearly labelled reference media. These are never presented as measurements from the cultivation room. Read [docs/internet-data.md](docs/internet-data.md) before changing media, weather locations, or external sources.
+| Service   | URL                                    |
+|-----------|----------------------------------------|
+| Backend   | http://localhost:5000                  |
+| Swagger   | http://localhost:5000/swagger-ui/index.html |
+| Frontend  | http://localhost:3000                  |
+| MQTT      | tcp://localhost:1883                   |
+
+---
+
+## 🔧 Khởi Chạy Thủ Công (Development)
+
+### Backend Java Spring Boot
+
+**Yêu Cầu:** Java 21+, Maven 3.9+, PostgreSQL 16+
+
+```powershell
+# 1. Chạy PostgreSQL (nếu chưa có)
+docker-compose up -d postgres mosquitto
+
+# 2. Tạo file .env trong backend-java/
+cp backend-java\.env.example backend-java\.env
+# Chỉnh sửa backend-java\.env với thông tin database
+
+# 3. Build và chạy
+cd backend-java
+mvn clean package
+java -jar target\backend-java-2.0.0.jar
+```
+
+### Frontend React
+
+**Yêu Cầu:** Node.js 20+
+
+```powershell
+cd frontend-web
+npm install
+npm run dev
+# → http://localhost:5173
+```
+
+### Mobile Flutter
+
+**Yêu Cầu:** Flutter SDK 3.x, Android Studio / Xcode
+
+```powershell
+cd mobile
+flutter pub get
+flutter run
+```
+
+---
+
+## 🔌 API Chính
+
+| Module            | Endpoint                     | Mô tả                     |
+|-------------------|------------------------------|---------------------------|
+| Auth              | `POST /api/v1/auth/login`    | Đăng nhập, lấy JWT        |
+| Auth              | `POST /api/v1/auth/register` | Đăng ký tài khoản         |
+| Dashboard         | `GET /api/v1/dashboard`      | Thống kê tổng quan        |
+| Rooms             | `GET /api/v1/rooms`          | Danh sách phòng trồng     |
+| Trays             | `GET /api/v1/trays`          | Danh sách khay            |
+| Devices           | `GET /api/v1/devices`        | Thiết bị IoT              |
+| Sensors           | `POST /api/v1/sensors/ingest`| Nhận dữ liệu cảm biến     |
+| Rentals           | `GET /api/v1/rentals`        | Quản lý thuê phòng        |
+| Harvest           | `GET /api/v1/harvest`        | Thu hoạch                 |
+| Alerts            | `GET /api/v1/alerts`         | Cảnh báo                  |
+| Users             | `GET /api/v1/users`          | Quản lý người dùng        |
+
+📖 **Swagger UI đầy đủ:** http://localhost:5000/swagger-ui/index.html
+
+---
+
+## 🔐 Phân Quyền
+
+| Role     | Quyền                                              |
+|----------|----------------------------------------------------|
+| `ADMIN`  | Toàn quyền — quản lý user, phòng, thiết bị, gói   |
+| `STAFF`  | Quản lý phòng, thiết bị, thu hoạch, cảnh báo       |
+| `CUSTOMER` | Xem phòng thuê của mình, tiến độ trồng           |
+
+---
+
+## 🌡️ MQTT — IoT ESP32
+
+Backend lắng nghe MQTT topics từ ESP32:
+
+| Topic                           | Hướng          | Nội dung              |
+|---------------------------------|----------------|-----------------------|
+| `mushroom/{deviceId}/telemetry` | ESP32 → Server | Nhiệt độ, độ ẩm, CO₂ |
+| `mushroom/{deviceId}/command`   | Server → ESP32 | Lệnh điều khiển       |
+| `mushroom/{deviceId}/ack`       | ESP32 → Server | Xác nhận lệnh         |
+
+---
+
+## 🗄️ Database
+
+- **PostgreSQL 16**
+- Schema: [`database/schema.sql`](database/schema.sql)
+- Seed data: [`database/seed.sql`](database/seed.sql)
+
+---
+
+## 🧪 Tests
+
+```powershell
+cd backend-java
+mvn test
+# 16 tests — 0 failures
+```
+
+---
+
+## 📱 Nhánh Git
+
+| Nhánh    | Nội dung                          |
+|----------|-----------------------------------|
+| `main`   | Tổng hợp toàn bộ — **production** |
+| `be`     | Backend Java Spring Boot          |
+| `fe`     | Frontend React + Vite             |
+| `mobile` | Flutter Mobile App                |
+| `iot`    | ESP32 Firmware                    |
+
+---
+
+## 🛠️ Công Nghệ
+
+- **Backend:** Java 21, Spring Boot 3.3.5, Spring Security, JWT, Spring Data JPA, PostgreSQL, Eclipse Paho MQTT, Springdoc OpenAPI
+- **Frontend:** React 18, Vite, Tailwind CSS
+- **Mobile:** Flutter 3.x, Dart
+- **IoT:** ESP32, Arduino, MQTT
+- **DevOps:** Docker, Docker Compose, GitHub Actions

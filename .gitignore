@@ -24,3 +24,9 @@ build/
 
 # VS Code
 .vscode/
+# Maven build artifacts
+**/target/
+backend-java/target/
+
+# Untracked local directory
+Java-2026/

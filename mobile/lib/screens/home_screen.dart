@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
-import '../services/api_service.dart';
+import '../models/mushroom_models.dart';
+import 'login_screen.dart';
+import 'tray_detail_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -9,313 +11,325 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final api = ApiService();
-  late Future<List<dynamic>> dataFuture;
+  int _selectedIndex = 0;
 
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
+  final List<RentalPackage> _packages = [
+    RentalPackage(
+      id: 'PKG-01',
+      name: 'Gói Nấm Bào Ngư Xám Tiêu Chuẩn',
+      mushroomType: 'Nấm Bào Ngư Xám',
+      durationDays: 30,
+      price: 350000,
+      description: 'Bao gồm 1 khay 10 phôi nấm, chăm sóc tự động IoT & thu hoạch 2-3 đợt.',
+    ),
+    RentalPackage(
+      id: 'PKG-02',
+      name: 'Gói Nấm Linh Chi Đỏ Cao Cấp',
+      mushroomType: 'Nấm Linh Chi Đỏ',
+      durationDays: 60,
+      price: 750000,
+      description: 'Kiểm soát vi khí hậu 24/7, theo dõi qua camera trực tiếp & đóng gói dược liệu.',
+    ),
+    RentalPackage(
+      id: 'PKG-03',
+      name: 'Gói Nấm Mối Đen Công Nghệ Cao',
+      mushroomType: 'Nấm Mối Đen',
+      durationDays: 45,
+      price: 620000,
+      description: 'Giám sát CO₂ và độ ẩm chính xác cao, cam kết sản lượng thu hoạch.',
+    ),
+  ];
 
-  void _load() {
-    setState(() {
-      dataFuture = Future.wait([
-        api.myTrays(),
-        api.dashboard().catch(() => {}),
-        api.outdoorWeather().catch(() => {}),
-      ]);
-    });
-  }
+  final List<CustomerTray> _myTrays = [
+    CustomerTray(
+      trayCode: 'TRAY-A102',
+      mushroomType: 'Nấm Bào Ngư Xám',
+      roomName: 'Phòng Nuôi Khu A - Tầng 1',
+      growthStage: 'Đang ra quả thể (Sắp thu hoạch)',
+      progressPercent: 80,
+      expectedHarvestDate: '24/11/2026',
+      temperature: 26.5,
+      humidity: 88.0,
+      co2Level: 650,
+    ),
+    CustomerTray(
+      trayCode: 'TRAY-B205',
+      mushroomType: 'Nấm Linh Chi Đỏ',
+      roomName: 'Phòng Nuôi Khu B - Tầng 2',
+      growthStage: 'Ươm tơ giai đoạn 2',
+      progressPercent: 45,
+      expectedHarvestDate: '15/12/2026',
+      temperature: 27.2,
+      humidity: 82.5,
+      co2Level: 720,
+    ),
+  ];
 
-  void _showHarvestRequestModal(BuildContext context, String trayId, String trayCode) {
-    final noteCtrl = TextEditingController(text: 'Yêu cầu thu hoạch và giao hàng tận nơi.');
-    showModalBottomSheet(
+final _rentalHistory = [
+    {
+      'orderId': 'ORD-20261025',
+      'package': 'Gói Nấm Bào Ngư Xám (Khay TRAY-A102)',
+      'date': '25/10/2026',
+      'amount': '350.000 VNĐ',
+      'status': 'Đang nuôi trồng',
+    },
+    {
+      'orderId': 'ORD-20261015',
+      'package': 'Gói Nấm Linh Chi Đỏ (Khay TRAY-B205)',
+      'date': '15/10/2026',
+      'amount': '750.000 VNĐ',
+      'status': 'Đang nuôi trồng',
+    },
+    {
+      'orderId': 'ORD-20260901',
+      'package': 'Gói Nấm Bào Ngư Xám (Khay TRAY-A098)',
+      'date': '01/09/2026',
+      'amount': '350.000 VNĐ',
+      'status': 'Đã thu hoạch xong',
+    },
+  ];
+
+  void _showLinkTrayDialog() {
+    final codeController = TextEditingController();
+    showDialog(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: const Color(0xFF0E1A2D),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(
-          left: 20,
-          right: 20,
-          top: 24,
-          bottom: MediaQuery.of(ctx).viewInsets.bottom + 28,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Liên kết mã khay mới'),
+        content: TextField(
+          controller: codeController,
+          decoration: const InputDecoration(
+            labelText: 'Nhập mã định danh khay (VD: TRAY-C301)',
+            border: OutlineInputBorder(),
+          ),
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('Yêu cầu thu hoạch · $trayCode', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
-                IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close, color: Colors.grey)),
-              ],
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: noteCtrl,
-              maxLines: 3,
-              style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(
-                labelText: 'Ghi chú giao hàng & đóng gói',
-                labelStyle: const TextStyle(color: Colors.white60),
-                filled: true,
-                fillColor: const Color(0xFF132238),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: FilledButton(
-                style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF10B981),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                onPressed: () async {
-                  try {
-                    await api.requestHarvest(trayId, noteCtrl.text.trim());
-                    if (ctx.mounted) Navigator.pop(ctx);
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Đã gửi yêu cầu thu hoạch đến nông trại!')),
-                      );
-                    }
-                  } catch (e) {
-                    if (ctx.mounted) {
-                      ScaffoldMessenger.of(ctx).showSnackBar(
-                        SnackBar(content: Text('Lỗi: $e'), backgroundColor: Colors.redAccent),
-                      );
-                    }
-                  }
-                },
-                child: const Text('Gửi yêu cầu thu hoạch', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-              ),
-            ),
-          ],
-        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
+          ElevatedButton(
+            onPressed: () {
+              if (codeController.text.trim().isNotEmpty) {
+                setState(() {
+                  _myTrays.add(
+                    CustomerTray(
+                      trayCode: codeController.text.trim().toUpperCase(),
+                      mushroomType: 'Nấm Bào Ngư Xám',
+                      roomName: 'Phòng Nuôi Khu C',
+                      growthStage: 'Mới khởi tạo',
+                      progressPercent: 10,
+                      expectedHarvestDate: '20/12/2026',
+                      temperature: 26.0,
+                      humidity: 85.0,
+                      co2Level: 600,
+                    ),
+                  );
+                });
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Liên kết khay thành công!')),
+                );
+              }
+            },
+            child: const Text('Xác nhận'),
+          ),
+        ],
       ),
     );
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(
-          title: const Text('Mushroom-IoT Smart Farm'),
-          actions: [
-            IconButton(icon: const Icon(Icons.refresh), onPressed: _load),
-          ],
-        ),
-        body: FutureBuilder<List<dynamic>>(
-          future: dataFuture,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState != ConnectionState.done) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            if (snapshot.hasError) {
-              return Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Text('Không tải được dữ liệu: ${snapshot.error}', style: const TextStyle(color: Colors.redAccent)),
+  Widget build(BuildContext context) {
+    final pages = [
+      _buildPackagesTab(),
+      _buildMyTraysTab(),
+      _buildProfileTab(),
+    ];
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Smart Mushroom Farm'),
+        backgroundColor: const Color(0xFF2E7D32),
+        foregroundColor: Colors.white,
+        actions: [
+          if (_selectedIndex == 1)
+            IconButton(
+              icon: const Icon(Icons.qr_code_scanner),
+              tooltip: 'Liên kết mã khay',
+              onPressed: _showLinkTrayDialog,
+            ),
+        ],
+      ),
+      body: pages[_selectedIndex],
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _selectedIndex,
+        onDestinationSelected: (idx) => setState(() => _selectedIndex = idx),
+        destinations: const [
+          NavigationDestination(icon: Icon(Icons.storefront), label: 'Gói thuê'),
+          NavigationDestination(icon: Icon(Icons.grass), label: 'Khay của tôi'),
+          NavigationDestination(icon: Icon(Icons.person), label: 'Tài khoản'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPackagesTab() {
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: _packages.length,
+      itemBuilder: (context, index) {
+        final pkg = _packages[index];
+        return Card(
+          margin: const EdgeInsets.only(bottom: 14),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        pkg.name,
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    Chip(
+                      label: Text('${pkg.durationDays} ngày'),
+                      backgroundColor: Colors.green[50],
+                    ),
+                  ],
                 ),
-              );
-            }
-
-            final trays = List<dynamic>.from((snapshot.data?[0] ?? []) as List);
-            final dashboard = Map<String, dynamic>.from((snapshot.data?[1] ?? {}) as Map);
-            final current = Map<String, dynamic>.from((dashboard['current'] ?? {}) as Map);
-
-            final tempVal = current['temperature'] != null ? '${double.tryParse(current['temperature'].toString())?.toStringAsFixed(1) ?? '25.8'}°C' : '25.8°C';
-            final humVal = current['humidity'] != null ? '${double.tryParse(current['humidity'].toString())?.toStringAsFixed(1) ?? '89.2'}%' : '89.2%';
-            final co2Val = current['co2'] != null ? '${double.tryParse(current['co2'].toString())?.round() ?? 640} ppm' : '640 ppm';
-
-            return RefreshIndicator(
-              onRefresh: () async => _load(),
-              child: ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  // Hero Welcome Card
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF064E3B), Color(0xFF0F253E)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: const Color(0x3310B981)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text('HỆ THỐNG VI KHÍ HẬU', style: TextStyle(color: Color(0xFF6EE7B7), fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
-                            Row(
-                              children: [
-                                Icon(Icons.circle, size: 8, color: Color(0xFF34D399)),
-                                SizedBox(width: 4),
-                                Text('Live IoT', style: TextStyle(color: Color(0xFF34D399), fontSize: 11, fontWeight: FontWeight.bold)),
-                              ],
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        const Text('Trang Trại Đang Trong Chu Kỳ Tối Ưu', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 4),
-                        const Text('Hệ thống phun sương và quạt đối lưu vận hành tự động theo ngưỡng sinh trưởng.', style: TextStyle(color: Colors.white70, fontSize: 12.5)),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 20),
-                  const Text('Vi khí hậu phòng trồng', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Colors.white)),
-                  const SizedBox(height: 10),
-
-                  // 3 KPI Cards
-                  Row(
-                    children: [
-                      Expanded(child: _metricCard('Nhiệt độ', tempVal, '24 – 28 °C', Icons.thermostat, const Color(0xFFF43F5E), const Color(0x22F43F5E))),
-                      const SizedBox(width: 10),
-                      Expanded(child: _metricCard('Độ ẩm', humVal, '85 – 95 %', Icons.water_drop, const Color(0xFF0EA5E9), const Color(0x220EA5E9))),
-                      const SizedBox(width: 10),
-                      Expanded(child: _metricCard('Khí CO₂', co2Val, '< 800 ppm', Icons.air, const Color(0xFF10B981), const Color(0x2210B981))),
-                    ],
-                  ),
-
-                  const SizedBox(height: 24),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Khay nấm của tôi', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Colors.white)),
-                      Text('${trays.length} khay đang thuê', style: const TextStyle(color: Color(0xFF34D399), fontSize: 13, fontWeight: FontWeight.w600)),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-
-                  if (trays.isEmpty)
-                    Container(
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF0E1A2D),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.white12),
-                      ),
-                      child: const Column(
-                        children: [
-                          Icon(Icons.spa_outlined, size: 40, color: Colors.grey),
-                          SizedBox(height: 10),
-                          Text('Bạn chưa có khay nấm nào đang thuê', style: TextStyle(color: Colors.white70, fontSize: 14)),
-                          SizedBox(height: 4),
-                          Text('Chuyển qua tab "Thuê" ở thanh dưới để chọn khay nhé!', style: TextStyle(color: Colors.white38, fontSize: 12)),
-                        ],
+                const SizedBox(height: 8),
+                Text(pkg.description, style: TextStyle(color: Colors.grey[700])),
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '${pkg.price.toStringAsFixed(0)} VNĐ',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF2E7D32),
                       ),
                     ),
-
-                  ...trays.map((raw) {
-                    final tray = Map<String, dynamic>.from(raw as Map);
-                    final growthDay = int.tryParse(tray['growth_day']?.toString() ?? '14') ?? 14;
-                    final progressPercent = (growthDay / 30.0).clamp(0.1, 1.0);
-
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 14),
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF0E1A2D),
-                        border: Border.all(color: Colors.white12),
-                        borderRadius: BorderRadius.circular(18),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF2E7D32),
+                        foregroundColor: Colors.white,
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(color: const Color(0xFF064E3B), borderRadius: BorderRadius.circular(8)),
-                                    child: const Icon(Icons.spa, size: 18, color: Color(0xFF34D399)),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Text('${tray['code'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
-                                ],
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(color: const Color(0x3310B981), borderRadius: BorderRadius.circular(6)),
-                                child: Text('Ngày $growthDay / 30', style: const TextStyle(color: Color(0xFF34D399), fontSize: 11, fontWeight: FontWeight.bold)),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          Text('${tray['mushroom_type'] ?? ''}', style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
-                          const SizedBox(height: 4),
-                          Text('Giai đoạn: ${tray['latest_stage'] ?? 'Ra quả thể'}', style: const TextStyle(color: Colors.white60, fontSize: 12.5)),
-                          const SizedBox(height: 12),
-                          LinearProgressIndicator(
-                            value: progressPercent,
-                            backgroundColor: const Color(0xFF132238),
-                            color: const Color(0xFF10B981),
-                            borderRadius: BorderRadius.circular(4),
-                            minHeight: 6,
-                          ),
-                          const SizedBox(height: 14),
-                          SizedBox(
-                            width: double.infinity,
-                            child: OutlinedButton.icon(
-                              style: OutlinedButton.styleFrom(
-                                side: const BorderSide(color: Color(0xFF10B981)),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                              ),
-                              onPressed: () => _showHarvestRequestModal(context, tray['id'].toString(), tray['code'].toString()),
-                              icon: const Icon(Icons.shopping_bag_outlined, size: 16, color: Color(0xFF10B981)),
-                              label: const Text('Yêu cầu thu hoạch / Giao nấm', style: TextStyle(color: Color(0xFF10B981), fontSize: 13)),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }),
-                ],
+                      onPressed: () {
+                        setState(() {
+                          _rentalHistory.insert(0, {
+                            'orderId': 'ORD-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
+                            'package': pkg.name,
+                            'date': 'Hôm nay',
+                            'amount': '${pkg.price.toStringAsFixed(0)} VNĐ',
+                            'status': 'Chờ xác nhận thanh toán',
+                          });
+                        });
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Đã đặt thuê & lưu vào lịch sử giao dịch: ${pkg.name}')),
+                        );
+                      },
+                      child: const Text('Thuê ngay'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildMyTraysTab() {
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: _myTrays.length,
+      itemBuilder: (context, index) {
+        final tray = _myTrays[index];
+        return Card(
+          margin: const EdgeInsets.only(bottom: 14),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          child: ListTile(
+            contentPadding: const EdgeInsets.all(16),
+            leading: CircleAvatar(
+              backgroundColor: Colors.green[100],
+              child: const Icon(Icons.eco, color: Color(0xFF2E7D32)),
+            ),
+            title: Text('${tray.trayCode} • ${tray.mushroomType}',
+                style: const TextStyle(fontWeight: FontWeight.bold)),
+            subtitle: Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                '${tray.growthStage}\nNhiệt độ: ${tray.temperature}°C | Độ ẩm: ${tray.humidity}%',
               ),
+            ),
+            trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => TrayDetailScreen(tray: tray)),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildProfileTab() {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        const ListTile(
+          leading: CircleAvatar(radius: 26, child: Icon(Icons.person, size: 30)),
+          title: Text('Khách hàng Demo', style: TextStyle(fontWeight: FontWeight.bold)),
+          subtitle: Text('customer@mushroom.local'),
+        ),
+        const Divider(),
+        const ListTile(
+          leading: Icon(Icons.notifications_active, color: Colors.orange),
+          title: Text('Thông báo cảnh báo môi trường'),
+          subtitle: Text('Khay TRAY-A102: Độ ẩm đạt chuẩn 88%, sẵn sàng thu hoạch.'),
+        ),
+        const Divider(),
+        const Padding(
+          padding: EdgeInsets.symmetric(vertical: 8),
+          child: Text(
+            'Lịch sử thuê & Giao dịch',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+        ),
+        ..._rentalHistory.map(
+          (item) => Card(
+            margin: const EdgeInsets.only(bottom: 10),
+            child: ListTile(
+              leading: const Icon(Icons.receipt_long, color: Color(0xFF2E7D32)),
+              title: Text(item['package']!, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+              subtitle: Text('Mã đơn: ${item['orderId']} • Ngày: ${item['date']}\nTrạng thái: ${item['status']}'),
+              trailing: Text(
+                item['amount']!,
+                style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF2E7D32)),
+              ),
+              isThreeLine: true,
+            ),
+          ),
+        ),
+        const Divider(),
+        ListTile(
+          leading: const Icon(Icons.logout, color: Colors.red),
+          title: const Text('Đăng xuất', style: TextStyle(color: Colors.red)),
+          onTap: () {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const LoginScreen()),
             );
           },
         ),
-      );
-
-  Widget _metricCard(String title, String val, String range, IconData icon, Color color, Color bg) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0E1A2D),
-        border: Border.all(color: Colors.white10),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(title, style: const TextStyle(color: Colors.white60, fontSize: 11, fontWeight: FontWeight.bold)),
-              Icon(icon, size: 16, color: color),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(val, style: TextStyle(color: color, fontSize: 18, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 4),
-          Text(range, style: const TextStyle(color: Colors.white38, fontSize: 9.5)),
-        ],
-      ),
+      ],
     );
   }
 }
